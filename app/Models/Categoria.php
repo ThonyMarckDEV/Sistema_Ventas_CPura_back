@@ -18,11 +18,12 @@ class Categoria extends Model
 
     protected $fillable = [
         'nombreCategoria',
-        'idProducto',
+        'descripcion', // Descripción de la categoría
     ];
 
-    public function producto()
+    // Relación de uno a muchos desde Categoria a Producto
+    public function productos()
     {
-        return $this->belongsTo(Producto::class, 'idProducto');
+        return $this->hasMany(Producto::class, 'idCategoria', 'idCategoria');
     }
 }

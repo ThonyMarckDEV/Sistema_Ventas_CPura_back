@@ -11,12 +11,16 @@ class CrearTablaProductos extends Migration
     public function up()
     {
         Schema::create('productos', function (Blueprint $table) {
-            $table->id('idProducto'); // La clave primaria es idProducto
+            $table->bigIncrements('idProducto');
             $table->string('nombreProducto');
             $table->text('descripcion');
             $table->decimal('precio', 8, 2);
             $table->integer('stock');
-            $table->string('imagen')->nullable(); // Ruta de la imagen
+            $table->string('imagen')->nullable();
+
+            // Clave foránea
+            $table->unsignedBigInteger('idCategoria');
+            $table->foreign('idCategoria')->references('idCategoria')->on('categorias')->onDelete('cascade');
         });
     }
 

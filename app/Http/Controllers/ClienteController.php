@@ -81,10 +81,29 @@ class ClienteController extends Controller
         return response()->json(['success' => true, 'message' => 'Datos actualizados correctamente']);
     }
 
+    // En tu controlador, por ejemplo ProductoController.php
+
     public function listarProductos()
     {
-        $productos = Producto::with('categoria')->get();
+        // Cargar productos con la relación de categoría y obtener el nombre de la categoría
+        $productos = Producto::with('categoria:idCategoria,nombreCategoria')->get();
+
+        // Transformar los datos para incluir el nombre de la categoría en la respuesta
+        $productos = $productos->map(function($producto) {
+            return [
+                'idProducto' => $producto->idProducto,
+                'nombreProducto' => $producto->nombreProducto,
+                'descripcion' => $producto->descripcion,
+                'nombreCategoria' => $producto->categoria ? $producto->categoria->nombreCategoria : 'Sin Categoría',
+                'precio' => $producto->precio,
+                'stock' => $producto->stock,
+                'imagen' => $producto->imagen,
+                
+            ];
+        });
+
         return response()->json(['data' => $productos], 200);
     }
+
 
 }

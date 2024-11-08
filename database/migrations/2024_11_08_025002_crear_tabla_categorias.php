@@ -11,12 +11,9 @@ class CrearTablaCategorias extends Migration
     public function up()
     {
         Schema::create('categorias', function (Blueprint $table) {
-            $table->id('idCategoria');
+            $table->bigIncrements('idCategoria'); // Clave primaria con bigIncrements (unsignedBigInteger)
             $table->string('nombreCategoria');
-            $table->unsignedBigInteger('idProducto'); // Asegúrate de que el tipo coincida
-
-            // Configuración de la clave foránea a `productos`
-            $table->foreign('idProducto')->references('idProducto')->on('productos')->onDelete('cascade');
+            $table->text('descripcion')->nullable();
         });
     }
 
