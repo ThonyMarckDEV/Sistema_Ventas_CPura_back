@@ -5,14 +5,60 @@ namespace App\Http\Controllers;
 use App\Models\Usuario;
 use Illuminate\Http\Request;
 use App\Models\Producto;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
-use Carbon\Carbon;
 
 class ClienteController extends Controller
 {
+    public function registerUser(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'username' => 'required|string|unique:usuarios,username',
+            'rol' => 'required|string',
+            'nombres' => 'required|string',
+            'apellidos' => 'required|string',
+            'dni' => 'required|string',
+            'correo' => 'required|email|unique:usuarios,correo',
+            'telefono' => 'required|string',
+            'password' => 'required|string',
+            'edad' => 'required|integer',
+        ]);
+    
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validación fallida',
+                'errors' => $validator->errors()
+            ], 400);
+        }
+    
+        try {
+            $user = Usuario::create([
+                'username' => $request->username,
+                'rol' => $request->rol,
+                'nombres' => $request->nombres,
+                'apellidos' => $request->apellidos,
+                'dni' => $request->dni,
+                'correo' => $request->correo,
+                'telefono' => $request->telefono,
+                'password' => bcrypt($request->password),
+                'edad' => $request->edad,
+                'status' => 'loggedOff', // Establece el status por defecto
+            ]);
+    
+            return response()->json(['success' => true, 'message' => 'Usuario registrado exitosamente'], 201);
+        } catch (\Exception $e) {
+            Log::error("Error en el registro de usuario: " . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error interno del servidor',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
     // En EstudianteController.php
     public function perfilCliente()
     {

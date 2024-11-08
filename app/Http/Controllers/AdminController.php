@@ -3,17 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Usuario;
-use App\Models\Especialidad;
-use App\Models\Grado;
-use App\Models\Curso;
-use App\Models\Modulo;
-use App\Models\AlumnoMatriculado;
-use App\Models\EspecialidadDocente;
-use App\Models\AsignacionAulaDocente;
+use App\Models\Categoria;
+use App\Models\Producto;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
-use Tymon\JWTAuth\Facades\JWTAuth;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+
 
 class AdminController extends Controller
 {
@@ -129,6 +124,123 @@ public function register(Request $request)
             return response()->json(['success' => true, 'message' => 'Usuario actualizado correctamente']);
         }
         return response()->json(['success' => false, 'message' => 'Usuario no encontrado'], 404);
+    }
+
+
+     // Obtener todas las categorías
+     public function listarCategorias()
+     {
+         $categorias = Categoria::all();
+         return response()->json(['success' => true, 'data' => $categorias], 200);
+     }
+
+
+// Listar todos los productos con el nombre de la categoría y URL completa de la imagen
+public function listarProductos()
+{
+    $productos = Producto::with('categoria:idCategoria,nombreCategoria')->get();
+
+    // Mapeo para agregar el nombre de la categoría y la URL completa de la imagen
+    $productos = $productos->map(function ($producto) {
+        return [
+            'idProducto' => $producto->idProducto,
+            'nombreProducto' => $producto->nombreProducto,
+            'descripcion' => $producto->descripcion,
+            'precio' => $producto->precio,
+            'stock' => $producto->stock,
+            'imagen' => $producto->imagen ? url("storage/{$producto->imagen}") : null, // URL completa de la imagen
+            'idCategoria' => $producto->idCategoria,
+            'nombreCategoria' => $producto->categoria ? $producto->categoria->nombreCategoria : null,
+        ];
+    });
+
+    return response()->json(['success' => true, 'data' => $productos], 200);
+}
+
+    // Crear un nuevo producto
+    public function agregarProducto(Request $request)
+    {
+        // Validar los datos de entrada, incluyendo el tipo de archivo de imagen
+        $request->validate([
+            'nombreProducto' => 'required|string|max:255',
+            'descripcion' => 'nullable|string',
+            'precio' => 'required|numeric',
+            'stock' => 'required|integer',
+            'imagen' => 'nullable|mimes:jpeg,jpg,png,gif|max:2048', // Solo formatos de imagen permitidos
+            'idCategoria' => 'required|exists:categorias,idCategoria',
+        ]);
+
+        // Crear un nuevo producto sin la imagen
+        $productoData = $request->except('imagen');
+
+        // Guardar la imagen si se proporciona
+        if ($request->hasFile('imagen')) {
+            $path = $request->file('imagen')->store('imagenes', 'public');
+            $productoData['imagen'] = $path;
+        }
+
+        // Crear el producto con los datos obtenidos
+        $producto = Producto::create($productoData);
+
+        return response()->json([
+            'success' => true, 
+            'message' => 'Producto creado exitosamente', 
+            'data' => $producto
+        ], 201);
+    }
+
+        // Actualizar un producto
+        public function actualizarProducto(Request $request, $id)
+        {
+            // Validación de los datos entrantes, incluyendo los tipos de archivo de imagen
+            $request->validate([
+                'nombreProducto' => 'required|string|max:255',
+                'descripcion' => 'nullable|string',
+                'precio' => 'required|numeric',
+                'stock' => 'required|integer',
+                'imagen' => 'nullable|mimes:jpeg,jpg,png,gif|max:2048', // Solo formatos de imagen permitidos
+                'idCategoria' => 'required|exists:categorias,idCategoria',
+            ]);
+
+            // Buscar el producto por ID
+            $producto = Producto::findOrFail($id);
+
+            // Procesar la nueva imagen si se proporciona
+            if ($request->hasFile('imagen')) {
+                // Eliminar la imagen anterior si existe
+                if ($producto->imagen && Storage::disk('public')->exists($producto->imagen)) {
+                    Storage::disk('public')->delete($producto->imagen);
+                }
+
+                // Guardar la nueva imagen y actualizar la ruta en el producto
+                $path = $request->file('imagen')->store('imagenes', 'public');
+                $producto->imagen = $path;
+            }
+
+            // Actualizar otros campos del producto
+            $producto->nombreProducto = $request->nombreProducto;
+            $producto->descripcion = $request->descripcion;
+            $producto->precio = $request->precio;
+            $producto->stock = $request->stock;
+            $producto->idCategoria = $request->idCategoria;
+            
+            // Guardar los cambios
+            $producto->save();
+
+            return response()->json([
+                'success' => true, 
+                'message' => 'Producto actualizado exitosamente', 
+                'data' => $producto
+            ], 200);
+        }
+
+
+    // Eliminar un producto
+    public function eliminarProducto($id)
+    {
+        $producto = Producto::findOrFail($id);
+        $producto->delete();
+        return response()->json(['success' => true, 'message' => 'Producto eliminado exitosamente'], 200);
     }
     
 }
