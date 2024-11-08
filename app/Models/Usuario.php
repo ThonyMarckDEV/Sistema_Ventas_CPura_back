@@ -5,8 +5,6 @@ namespace App\Models;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Tymon\JWTAuth\Contracts\JWTSubject;
-use App\Models\Especialidad;
-use App\Models\ActividadUsuario; // Asegúrate de importar el modelo correcto
 
 class Usuario extends Authenticatable implements JWTSubject
 {
@@ -37,16 +35,12 @@ class Usuario extends Authenticatable implements JWTSubject
             'idUsuario' => $this->idUsuario,
             'dni' => $this->dni,
             'nombres' => $this->nombres,
+            'username' => $this->username, // Agregar username al JWT
+            'email' => $this->email, // Agregar email al JWT
             'estado' => $this->status, 
             'rol' => $this->rol,
         ];
     }
-
-    public function especialidades()
-    {
-        return $this->belongsToMany(Especialidad::class, 'especialidad_docente', 'idDocente', 'idEspecialidad');
-    }
-
     // Relación con ActividadUsuario
     public function activity()
     {

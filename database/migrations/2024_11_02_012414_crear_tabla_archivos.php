@@ -12,7 +12,7 @@ class CrearTablaArchivos extends Migration
             $table->bigIncrements('id');
             $table->string('nombre', 255);
             $table->string('tipo', 255);
-            $table->string('ruta'); // Almacenará la ruta del archivo en el sistema de archivos
+            $table->string('ruta');
             $table->unsignedBigInteger('idModulo');
             
             $table->foreign('idModulo')->references('idModulo')->on('modulos')->onDelete('cascade');

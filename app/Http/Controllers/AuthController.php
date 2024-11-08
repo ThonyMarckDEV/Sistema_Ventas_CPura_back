@@ -13,43 +13,51 @@ use Carbon\Carbon;
 
 class AuthController extends Controller
 {
-    /**
- * Login de usuario y generación de token JWT.
- */
+        /**
+     * Login de usuario y generación de token JWT.
+     */
     public function login(Request $request)
     {
-   
+        // Validar que el correo y la contraseña están presentes
         $request->validate([
-            'username' => 'required|string',
+            'correo' => 'required|email',
             'password' => 'required|string|min:6',
         ]);
 
-        $credentials = $request->only('username', 'password');
+        // Obtener las credenciales de correo y contraseña
+        $credentials = [
+            'correo' => $request->input('correo'),
+            'password' => $request->input('password')
+        ];
 
         try {
-            
-            $usuario = Usuario::where('username', $credentials['username'])->first();
+            // Buscar el usuario por correo
+            $usuario = Usuario::where('correo', $credentials['correo'])->first();
 
-           
+            // Verificar si el usuario existe
             if (!$usuario) {
                 return response()->json(['error' => 'Usuario no encontrado'], 404);
             }
 
-          
+            // Verificar si el usuario ya está logueado
             if ($usuario->status === 'loggedOn') {
                 return response()->json(['message' => 'Usuario ya logueado'], 409);
             }
 
-            
-            if (!$token = JWTAuth::attempt($credentials)) {
+            // Intentar autenticar y generar el token JWT usando el campo 'correo'
+            if (!$token = JWTAuth::attempt(['correo' => $credentials['correo'], 'password' => $credentials['password']])) {
                 return response()->json(['error' => 'Credenciales inválidas'], 401);
             }
+
+            // Actualizar el estado del usuario a "loggedOn"
+            $usuario->update(['status' => 'loggedOn']);
 
             return response()->json(compact('token'));
         } catch (JWTException $e) {
             return response()->json(['error' => 'No se pudo crear el token'], 500);
         }
     }
+
 
     /**
      * Logout del usuario y revocación del token JWT.
