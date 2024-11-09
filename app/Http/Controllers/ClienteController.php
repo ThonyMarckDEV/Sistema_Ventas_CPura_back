@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Usuario;
+use App\Models\Carrito;
+use App\Models\CarritoDetalle;
 use Illuminate\Http\Request;
 use App\Models\Producto;
 use Illuminate\Support\Facades\Auth;
@@ -25,7 +27,7 @@ class ClienteController extends Controller
             'password' => 'required|string',
             'edad' => 'required|integer',
         ]);
-    
+
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
@@ -33,8 +35,9 @@ class ClienteController extends Controller
                 'errors' => $validator->errors()
             ], 400);
         }
-    
+
         try {
+            // Crear el usuario
             $user = Usuario::create([
                 'username' => $request->username,
                 'rol' => $request->rol,
@@ -47,8 +50,16 @@ class ClienteController extends Controller
                 'edad' => $request->edad,
                 'status' => 'loggedOff', // Establece el status por defecto
             ]);
-    
+
+            // Crear el carrito solo si el rol es cliente
+            if ($request->rol === 'cliente') {
+                $carrito = Carrito::create([
+                    'idUsuario' => $user->idUsuario
+                ]);
+            }
+
             return response()->json(['success' => true, 'message' => 'Usuario registrado exitosamente'], 201);
+
         } catch (\Exception $e) {
             Log::error("Error en el registro de usuario: " . $e->getMessage());
             return response()->json([
@@ -151,5 +162,117 @@ class ClienteController extends Controller
         return response()->json(['data' => $productos], 200);
     }
 
+    public function agregarAlCarrito(Request $request)
+    {
+        $validatedData = $request->validate([
+            'idProducto' => 'required|exists:productos,idProducto',
+            'cantidad' => 'required|integer|min:1'
+        ]);
+    
+        $userId = auth()->id(); // Obtén el ID del usuario autenticado
+    
+        try {
+            // Encuentra el carrito del usuario
+            $carrito = Carrito::where('idUsuario', $userId)->firstOrFail();
+    
+            // Crea un nuevo detalle en el carrito
+            CarritoDetalle::create([
+                'idCarrito' => $carrito->idCarrito,
+                'idProducto' => $validatedData['idProducto'],
+                'cantidad' => $validatedData['cantidad'],
+                'precio' => Producto::find($validatedData['idProducto'])->precio
+            ]);
+    
+            return response()->json(['success' => true, 'message' => 'Producto agregado al carrito'], 201);
+        } catch (\Exception $e) {
+            \Log::error("Error al agregar producto al carrito: " . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Error al agregar al carrito'], 500);
+        }
+    }
+
+
+    public function listarCarrito()
+    {
+        try {
+            $userId = Auth::id();
+            Log::info("Obteniendo carrito para el usuario ID: " . $userId);
+
+            // Obtener los productos en el carrito del usuario autenticado
+            $carritoDetalles = CarritoDetalle::with('producto')
+                ->whereHas('carrito', function($query) use ($userId) {
+                    Log::info("Aplicando whereHas en CarritoDetalle para idUsuario: " . $userId);
+                    $query->where('idUsuario', $userId);
+                })
+                ->get();
+
+            Log::info("Productos en el carrito encontrados: " . $carritoDetalles->count());
+
+            $productos = $carritoDetalles->map(function($detalle) {
+                Log::info("Procesando detalle del producto ID: " . $detalle->producto->idProducto);
+                return [
+                    'idProducto' => $detalle->producto->idProducto,
+                    'nombreProducto' => $detalle->producto->nombreProducto,
+                    'descripcion' => $detalle->producto->descripcion,
+                    'cantidad' => $detalle->cantidad,
+                    'precio' => (float) $detalle->precio, // Asegura que sea un float
+                    'subtotal' => (float) ($detalle->precio * $detalle->cantidad),
+                ];
+            });
+
+            Log::info("Lista de productos procesada con éxito.");
+            
+            return response()->json(['success' => true, 'data' => $productos], 200);
+        } catch (\Exception $e) {
+            Log::error("Error al obtener el carrito: " . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Error al obtener el carrito'], 500);
+        }
+    }
+
+ 
+     // Actualizar la cantidad de un producto en el carrito
+     public function actualizarCantidad(Request $request, $idProducto)
+     {
+         $userId = Auth::id();
+         $cantidad = $request->input('cantidad');
+ 
+         // Buscar el detalle del carrito que corresponde al producto y usuario autenticado
+         $detalle = CarritoDetalle::whereHas('carrito', function($query) use ($userId) {
+                 $query->where('carrito.idUsuario', $userId); // Cambiar `carrito.id` por `carrito.idUsuario`
+             })
+             ->where('idProducto', $idProducto)
+             ->first();
+ 
+         if (!$detalle) {
+             return response()->json(['success' => false, 'message' => 'Producto no encontrado en el carrito'], 404);
+         }
+ 
+         // Actualizar la cantidad
+         $detalle->cantidad = $cantidad;
+         $detalle->save();
+ 
+         return response()->json(['success' => true, 'message' => 'Cantidad actualizada'], 200);
+     }
+ 
+     // Eliminar un producto del carrito
+     public function eliminarProducto($idProducto)
+     {
+         $userId = Auth::id();
+ 
+         // Buscar el detalle del carrito que corresponde al producto y usuario autenticado
+         $detalle = CarritoDetalle::whereHas('carrito', function($query) use ($userId) {
+                 $query->where('carrito.idUsuario', $userId); // Cambiar `carrito.id` por `carrito.idUsuario`
+             })
+             ->where('idProducto', $idProducto)
+             ->first();
+ 
+         if (!$detalle) {
+             return response()->json(['success' => false, 'message' => 'Producto no encontrado en el carrito'], 404);
+         }
+ 
+         // Eliminar el detalle del carrito
+         $detalle->delete();
+ 
+         return response()->json(['success' => true, 'message' => 'Producto eliminado del carrito'], 200);
+     }
 
 }

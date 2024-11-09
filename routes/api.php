@@ -54,6 +54,12 @@ use App\Http\Controllers\AuthController;
         Route::post('uploadProfileImageCliente/{idUsuario}', [ClienteController::class, 'uploadProfileImageCliente']);
         Route::put('updateCliente/{idUsuario}', [ClienteController::class, 'updateCliente']);
         Route::get('productos', [ClienteController::class, 'listarProductos']);
+
+        // Ruta para agregar un producto al carrito
+        Route::post('agregarCarrito', [ClienteController::class, 'agregarAlCarrito']);
+        Route::get('carrito', [ClienteController::class, 'listarCarrito']); // Listar productos en el carrito
+        Route::put('carrito_detalle/{idProducto}', [ClienteController::class, 'actualizarCantidad']); // Actualizar cantidad de producto
+        Route::delete('carrito_detalle/{idProducto}', [ClienteController::class, 'eliminarProducto']); // Eliminar producto del carrito
     });
 
 //================================================================================================
