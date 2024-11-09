@@ -242,5 +242,72 @@ public function listarProductos()
         $producto->delete();
         return response()->json(['success' => true, 'message' => 'Producto eliminado exitosamente'], 200);
     }
+
+
+    public function agregarCategoria(Request $request)
+    {
+        $request->validate([
+            'nombreCategoria' => 'required|string|max:255',
+            'descripcion' => 'nullable|string|max:500',
+        ]);
+
+        $categoria = Categoria::create([
+            'nombreCategoria' => $request->nombreCategoria,
+            'descripcion' => $request->descripcion,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Categoría agregada exitosamente',
+            'data' => $categoria
+        ]);
+    }
+
+      // Método para actualizar una categoría
+      public function actualizarCategoria(Request $request, $id)
+      {
+          $request->validate([
+              'nombreCategoria' => 'required|string|max:255',
+              'descripcion' => 'nullable|string|max:500',
+          ]);
+  
+          $categoria = Categoria::find($id);
+          if (!$categoria) {
+              return response()->json([
+                  'success' => false,
+                  'message' => 'Categoría no encontrada'
+              ], 404);
+          }
+  
+          $categoria->update([
+              'nombreCategoria' => $request->nombreCategoria,
+              'descripcion' => $request->descripcion,
+          ]);
+  
+          return response()->json([
+              'success' => true,
+              'message' => 'Categoría actualizada exitosamente',
+              'data' => $categoria
+          ]);
+      }
+  
+      // Método para eliminar una categoría
+      public function eliminarCategoria($id)
+      {
+          $categoria = Categoria::find($id);
+          if (!$categoria) {
+              return response()->json([
+                  'success' => false,
+                  'message' => 'Categoría no encontrada'
+              ], 404);
+          }
+  
+          $categoria->delete();
+  
+          return response()->json([
+              'success' => true,
+              'message' => 'Categoría eliminada exitosamente'
+          ]);
+      }
     
 }

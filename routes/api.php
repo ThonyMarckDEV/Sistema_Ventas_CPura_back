@@ -35,11 +35,17 @@ use App\Http\Controllers\AuthController;
     // RUTAS PARA ADMINISTRADOR VALIDADA POR MIDDLEWARE AUTH (PARA TOKEN JWT) Y CHECKROLE (PARA VALIDAR ROL DEL TOKEN)
     Route::middleware(['auth.jwt', 'checkRoleMW:admin'])->group(function () { 
         Route::post('register', [AdminController::class, 'register']);
-        Route::post('/agregarProducto', [AdminController::class, 'agregarProducto']);
+
         Route::put('/actualizarUsuario/{id}', [AdminController::class, 'actualizarUsuario']);
         Route::delete('/eliminarUsuario/{id}', [AdminController::class, 'eliminarUsuario']);
+
+        Route::post('/agregarProducto', [AdminController::class, 'agregarProducto']);
         Route::post('/actualizarProducto/{id}', [AdminController::class, 'actualizarProducto']);
         Route::delete('/eliminarProducto/{id}', [AdminController::class, 'eliminarProducto']);
+
+        Route::post('/agregarCategoria', [AdminController::class, 'agregarCategoria']);
+        Route::put('/actualizarCategoria/{id}', [AdminController::class, 'actualizarCategoria']);
+        Route::delete('/eliminarCategoria/{id}', [AdminController::class, 'eliminarCategoria']);
     });
 
     // RUTAS PARA CLIENTE VALIDADA POR MIDDLEWARE AUTH (PARA TOKEN JWT) Y CHECKROLE (PARA VALIDAR ROL DEL TOKEN)
