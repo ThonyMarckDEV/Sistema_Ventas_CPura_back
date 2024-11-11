@@ -30,6 +30,8 @@ class Usuario extends Authenticatable implements JWTSubject
     {
         // Asegúrate de actualizar el estado antes de emitir el token
         $this->update(['status' => 'loggedOn']);
+        
+        $carrito = $this->carrito()->first();
 
         return [
             'idUsuario' => $this->idUsuario,
@@ -39,6 +41,7 @@ class Usuario extends Authenticatable implements JWTSubject
             'email' => $this->email, // Agregar email al JWT
             'estado' => $this->status, 
             'rol' => $this->rol,
+            'idCarrito' => $carrito ? $carrito->idCarrito : null, // Agrega idCarrito al JWT
         ];
     }
     // Relación con ActividadUsuario

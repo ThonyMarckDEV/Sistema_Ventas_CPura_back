@@ -14,6 +14,14 @@ class Pago extends Model
 
     public $timestamps = false;
 
+    protected $fillable = [
+        'idPedido',
+        'monto',
+        'metodo_pago',
+        'estado_pago',
+        // Otros campos si los hay
+    ];
+
     public function pedido()
     {
         return $this->belongsTo(Pedido::class, 'idPedido');

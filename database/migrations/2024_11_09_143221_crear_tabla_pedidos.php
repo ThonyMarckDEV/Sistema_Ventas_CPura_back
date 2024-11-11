@@ -12,13 +12,11 @@ class CrearTablaPedidos extends Migration
         Schema::create('pedidos', function (Blueprint $table) {
             $table->id('idPedido');
             $table->unsignedBigInteger('idUsuario');
-            $table->unsignedBigInteger('idCarrito');
             $table->decimal('total', 10, 2);
-            $table->enum('estado', ['pendiente', 'pagado', 'enviado', 'completado'])->default('pendiente');
+            $table->enum('estado', ['pendiente', 'aprobando', 'en preparacion', 'enviado', 'completado'])->default('pendiente');
 
             // Claves foráneas
             $table->foreign('idUsuario')->references('idUsuario')->on('usuarios')->onDelete('cascade');
-            $table->foreign('idCarrito')->references('idCarrito')->on('carrito')->onDelete('cascade');
         });
     }
 

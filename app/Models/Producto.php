@@ -35,4 +35,10 @@ class Producto extends Model
     {
         return $this->hasMany(CarritoDetalle::class, 'idProducto', 'idProducto');
     }
+
+    public function pedidos()
+    {
+        return $this->hasMany(PedidoDetalle::class, 'idProducto', 'idProducto');
+    }
+
 }

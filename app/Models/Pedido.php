@@ -9,10 +9,17 @@ use Illuminate\Database\Eloquent\Model;
 class Pedido extends Model
 {
     use HasFactory;
+    protected $primaryKey = 'idPedido';
 
     protected $table = 'pedidos';
 
     public $timestamps = false;
+
+    protected $fillable = [
+        'idUsuario',
+        'total',
+        'estado',
+    ];
 
     public function usuario()
     {
@@ -28,4 +35,10 @@ class Pedido extends Model
     {
         return $this->hasOne(Pago::class, 'idPedido');
     }
+
+    public function detalles()
+    {
+        return $this->hasMany(PedidoDetalle::class, 'idPedido', 'idPedido');
+    }
+
 }

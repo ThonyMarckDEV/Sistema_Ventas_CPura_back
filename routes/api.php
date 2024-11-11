@@ -60,6 +60,12 @@ use App\Http\Controllers\AuthController;
         Route::get('carrito', [ClienteController::class, 'listarCarrito']); // Listar productos en el carrito
         Route::put('carrito_detalle/{idProducto}', [ClienteController::class, 'actualizarCantidad']); // Actualizar cantidad de producto
         Route::delete('carrito_detalle/{idProducto}', [ClienteController::class, 'eliminarProducto']); // Eliminar producto del carrito
+        
+        Route::post('/pedido', [ClienteController::class, 'crearPedido']);
+        // Ruta para listar pedidos de un usuario
+        Route::get('/pedidos/{idUsuario}', [ClienteController::class, 'listarPedidos']);
+        // Ruta para procesar el pago de un pedido
+        Route::post('/procesar-pago/{idPedido}', [ClienteController::class, 'procesarPago']);
     });
 
 //================================================================================================

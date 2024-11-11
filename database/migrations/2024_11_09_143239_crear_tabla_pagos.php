@@ -1,6 +1,5 @@
 <?php
 
-// database/migrations/xxxx_xx_xx_xxxxxx_create_pagos_table.php
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -13,8 +12,9 @@ class CrearTablaPagos extends Migration
             $table->id('idPago');
             $table->unsignedBigInteger('idPedido');
             $table->decimal('monto', 10, 2);
-            $table->enum('metodo_pago', ['tarjeta', 'paypal', 'transferencia']);
+            $table->enum('metodo_pago', ['yape', 'plin','efectivo']);
             $table->enum('estado_pago', ['pendiente', 'completado'])->default('pendiente');
+            $table->string('ruta_comprobante')->nullable(); // Agregada la columna ruta_comprobante
 
             // Clave foránea
             $table->foreign('idPedido')->references('idPedido')->on('pedidos')->onDelete('cascade');
