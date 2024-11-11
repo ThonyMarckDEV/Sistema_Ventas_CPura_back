@@ -274,98 +274,101 @@ class ClienteController extends Controller
 
      
      public function crearPedido(Request $request)
-     {
-         // Iniciar una transacción para asegurar la integridad de las operaciones
-         DB::beginTransaction();
-     
-         try {
-             // Validar los datos de la solicitud (sin `metodo_pago`)
-             $request->validate([
-                 'idUsuario' => 'required|integer',
-                 'idCarrito' => 'required|integer',
-                 'total' => 'required|numeric',
-             ]);
-     
-             // Obtener los datos de la solicitud
-             $idUsuario = $request->input('idUsuario');
-             $idCarrito = $request->input('idCarrito');
-             $total = $request->input('total');
-             $estadoPedido = 'pendiente';
-             $estadoPago = 'pendiente'; // Estado de pago predeterminado
-     
-             // Crear el pedido en la tabla 'pedidos'
-             $pedidoId = DB::table('pedidos')->insertGetId([
-                 'idUsuario' => $idUsuario,
-                 'total' => $total,
-                 'estado' => $estadoPedido,
-             ]);
-     
-             // Obtener los detalles del carrito desde 'carrito_detalle'
-             $detallesCarrito = DB::table('carrito_detalle')
-                 ->where('idCarrito', $idCarrito)
-                 ->get();
-     
-             if ($detallesCarrito->isEmpty()) {
-                 throw new \Exception('El carrito está vacío.');
-             }
-     
-             // Recorrer cada detalle del carrito para insertar en 'pedido_detalle'
-             foreach ($detallesCarrito as $detalle) {
-                 $producto = DB::table('productos')->where('idProducto', $detalle->idProducto)->first();
-     
-                 if (!$producto) {
-                     throw new \Exception("Producto con ID {$detalle->idProducto} no encontrado.");
-                 }
-     
-                 // Verificar stock suficiente
-                 if ($producto->stock < $detalle->cantidad) {
-                     throw new \Exception("Stock insuficiente para el producto: {$producto->nombreProducto}.");
-                 }
-     
-                 // Calcular subtotal y guardar el detalle del pedido
-                 $subtotal = $detalle->cantidad * $detalle->precio;
-                 DB::table('pedido_detalle')->insert([
-                     'idPedido' => $pedidoId,
-                     'idProducto' => $detalle->idProducto,
-                     'cantidad' => $detalle->cantidad,
-                     'precioUnitario' => $detalle->precio,
-                     'subtotal' => $subtotal,
-                 ]);
-             }
-     
-             // Insertar en la tabla 'pagos' sin `metodo_pago`
-             DB::table('pagos')->insert([
-                 'idPedido' => $pedidoId,
-                 'monto' => $total,
-                 'estado_pago' => $estadoPago, // Establecido en 'pendiente'
-             ]);
-     
-             // Borrar los productos del carrito desde 'carrito_detalle'
-             DB::table('carrito_detalle')
-                 ->where('idCarrito', $idCarrito)
-                 ->delete();
-     
-             // Confirmar la transacción
-             DB::commit();
-     
-             // Devolver una respuesta exitosa
-             return response()->json([
-                 'success' => true,
-                 'message' => 'Pedido y pago creados exitosamente.',
-                 'idPedido' => $pedidoId,
-             ], 201);
-     
-         } catch (\Exception $e) {
-             DB::rollBack();
-             Log::error('Error al crear pedido y pago: ' . $e->getMessage());
-             return response()->json([
-                 'success' => false,
-                 'message' => 'Error al crear el pedido y el pago.',
-                 'error' => $e->getMessage(),
-             ], 500);
-         }
-     }
-    
+    {
+        // Iniciar una transacción para asegurar la integridad de las operaciones
+        DB::beginTransaction();
+
+        try {
+            // Validar los datos de la solicitud (sin `metodo_pago`)
+            $request->validate([
+                'idUsuario' => 'required|integer',
+                'idCarrito' => 'required|integer',
+                'total' => 'required|numeric',
+            ]);
+
+            // Obtener los datos de la solicitud
+            $idUsuario = $request->input('idUsuario');
+            $idCarrito = $request->input('idCarrito');
+            $total = $request->input('total');
+            $estadoPedido = 'pendiente';
+            $estadoPago = 'pendiente';
+
+            // Crear el pedido en la tabla 'pedidos'
+            $pedidoId = DB::table('pedidos')->insertGetId([
+                'idUsuario' => $idUsuario,
+                'total' => $total,
+                'estado' => $estadoPedido,
+            ]);
+
+            // Obtener los detalles del carrito desde 'carrito_detalle'
+            $detallesCarrito = DB::table('carrito_detalle')
+                ->where('idCarrito', $idCarrito)
+                ->get();
+
+            if ($detallesCarrito->isEmpty()) {
+                throw new \Exception('El carrito está vacío.');
+            }
+
+            // Recorrer cada detalle del carrito para insertar en 'pedido_detalle'
+            foreach ($detallesCarrito as $detalle) {
+                $producto = DB::table('productos')->where('idProducto', $detalle->idProducto)->first();
+
+                if (!$producto) {
+                    throw new \Exception("Producto con ID {$detalle->idProducto} no encontrado.");
+                }
+
+                // Verificar stock suficiente
+                if ($producto->stock < $detalle->cantidad) {
+                    throw new \Exception("Stock insuficiente para el producto: {$producto->nombreProducto}.");
+                }
+
+                // Calcular subtotal y guardar el detalle del pedido
+                $subtotal = $detalle->cantidad * $detalle->precio;
+                DB::table('pedido_detalle')->insert([
+                    'idPedido' => $pedidoId,
+                    'idProducto' => $detalle->idProducto,
+                    'cantidad' => $detalle->cantidad,
+                    'precioUnitario' => $detalle->precio,
+                    'subtotal' => $subtotal,
+                ]);
+            }
+
+            // Insertar en la tabla 'pagos' solo si se proporciona un método de pago y comprobante
+            if ($request->has('metodo_pago') && $request->file('comprobante')) {
+                DB::table('pagos')->insert([
+                    'idPedido' => $pedidoId,
+                    'monto' => $total,
+                    'estado_pago' => $estadoPago,
+                    'metodo_pago' => $request->input('metodo_pago'),
+                    'comprobante' => $request->file('comprobante')->store('comprobantes', 'public')
+                ]);
+            }
+
+            // Borrar los productos del carrito desde 'carrito_detalle'
+            DB::table('carrito_detalle')
+                ->where('idCarrito', $idCarrito)
+                ->delete();
+
+            // Confirmar la transacción
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pedido y pago creados exitosamente.',
+                'idPedido' => $pedidoId,
+            ], 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error al crear pedido y pago: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al crear el pedido y el pago.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+        
      
      public function showBoleta($idPedido)
      {

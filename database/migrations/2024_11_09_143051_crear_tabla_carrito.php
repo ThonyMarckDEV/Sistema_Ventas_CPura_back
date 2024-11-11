@@ -13,7 +13,10 @@ class CrearTablaCarrito extends Migration
             $table->id('idCarrito');
             $table->unsignedBigInteger('idUsuario');
             
-            $table->foreign('idUsuario')->references('idUsuario')->on('usuarios');
+            $table->foreign('idUsuario')
+                ->references('idUsuario')
+                ->on('usuarios')
+                ->onDelete('cascade');
         });
     }
 

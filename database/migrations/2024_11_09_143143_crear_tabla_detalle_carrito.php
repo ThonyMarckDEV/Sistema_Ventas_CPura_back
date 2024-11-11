@@ -11,13 +11,13 @@ class CrearTablaDetalleCarrito extends Migration
     {
         Schema::create('carrito_detalle', function (Blueprint $table) {
             $table->id('idDetalle');
-            $table->unsignedBigInteger('idCarrito');
-            $table->unsignedBigInteger('idProducto');
-            $table->integer('cantidad');
-            $table->decimal('precio', 10, 2);
+            $table->unsignedBigInteger('idCarrito'); // Mismo tipo que en la tabla `carrito`
 
-            $table->foreign('idCarrito')->references('idCarrito')->on('carrito')->onDelete('cascade');
-            $table->foreign('idProducto')->references('idProducto')->on('productos')->onDelete('cascade');
+            // Clave foránea
+            $table->foreign('idCarrito')
+                ->references('idCarrito')
+                ->on('carrito')
+                ->onDelete('cascade'); // Activar cascada en eliminación
         });
     }
 
