@@ -66,6 +66,9 @@ use App\Http\Controllers\AuthController;
         Route::get('/pedidos/{idUsuario}', [ClienteController::class, 'listarPedidos']);
         // Ruta para procesar el pago de un pedido
         Route::post('/procesar-pago/{idPedido}', [ClienteController::class, 'procesarPago']);
+    
+        Route::get('/carrito/cantidad', [ClienteController::class, 'obtenerCantidadCarrito']);
+        Route::post('/pedidos/cantidad', [ClienteController::class, 'obtenerCantidadPedidos']);
     });
 
 //================================================================================================

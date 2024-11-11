@@ -171,14 +171,15 @@ class ClienteController extends Controller
     {
         $validatedData = $request->validate([
             'idProducto' => 'required|exists:productos,idProducto',
-            'cantidad' => 'required|integer|min:1'
+            'cantidad' => 'required|integer|min:1',
+            'idUsuario' => 'required|exists:usuarios,idUsuario' // Asegúrate de que el idUsuario esté presente y exista en la tabla de usuarios
         ]);
     
-        $userId = auth()->id(); // Obtén el ID del usuario autenticado
-    
         try {
-            // Encuentra el carrito del usuario
-            $carrito = Carrito::where('idUsuario', $userId)->firstOrFail();
+            // Encuentra o crea el carrito del usuario
+            $carrito = Carrito::firstOrCreate(
+                ['idUsuario' => $validatedData['idUsuario']]
+            );
     
             // Crea un nuevo detalle en el carrito
             CarritoDetalle::create([
@@ -190,10 +191,10 @@ class ClienteController extends Controller
     
             return response()->json(['success' => true, 'message' => 'Producto agregado al carrito'], 201);
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => 'Error al agregar al carrito'], 500);
+            return response()->json(['success' => false, 'message' => 'Error al agregar al carrito', 'error' => $e->getMessage()], 500);
         }
     }
-
+    
 
     public function listarCarrito()
     {
@@ -516,6 +517,42 @@ class ClienteController extends Controller
              Log::error('Error al procesar el pago: ' . $e->getMessage());
              return response()->json(['success' => false, 'message' => 'Error al procesar el pago.', 'error' => $e->getMessage()], 500);
          }
+     }
+
+     public function obtenerCantidadCarrito(Request $request)
+     {
+         // Obtén el idUsuario de los parámetros de la URL
+         $idUsuario = $request->query('idUsuario');
+ 
+         if (!$idUsuario) {
+             return response()->json(['success' => false, 'message' => 'idUsuario no proporcionado'], 400);
+         }
+ 
+         // Consulta la cantidad total de productos en el carrito del usuario
+         $cantidadProductos = DB::table('carrito_detalle')
+             ->join('carrito', 'carrito_detalle.idCarrito', '=', 'carrito.idCarrito')
+             ->where('carrito.idUsuario', $idUsuario)
+             ->sum('carrito_detalle.cantidad');
+ 
+         return response()->json(['cantidad' => $cantidadProductos]);
+     }
+
+
+     public function obtenerCantidadPedidos(Request $request)
+     {
+         // Obtener el idUsuario desde el token JWT en el frontend
+         $idUsuario = $request->input('idUsuario');
+ 
+         if (!$idUsuario) {
+             return response()->json(['success' => false, 'message' => 'idUsuario no proporcionado'], 400);
+         }
+ 
+         // Consulta la cantidad de pedidos del usuario
+         $cantidadPedidos = DB::table('pedidos')
+             ->where('idUsuario', $idUsuario)
+             ->count();
+ 
+         return response()->json(['cantidad' => $cantidadPedidos]);
      }
 
 }
