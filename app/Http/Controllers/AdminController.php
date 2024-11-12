@@ -8,7 +8,7 @@ use App\Models\Producto;
 use App\Models\Carrito;
 use App\Models\Pedido;
 use App\Models\Pago;
-use App\Models\PedidoDetalle;
+use App\Models\DetalleDireccionPedido;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
@@ -411,6 +411,31 @@ public function listarProductos()
         $pedido->delete();
 
         return response()->json(['success' => true, 'message' => 'Pedido eliminado correctamente']);
+    }
+
+    public function obtenerDireccionPedido($idPedido)
+    {
+        $direccion = DetalleDireccionPedido::where('idPedido', $idPedido)
+            ->with('detalleDireccion') // Cargar datos de relación detalle_direccion
+            ->first();
+
+        if ($direccion) {
+            return response()->json([
+                'success' => true,
+                'direccion' => [
+                    'region' => $direccion->detalleDireccion->region,
+                    'provincia' => $direccion->detalleDireccion->provincia,
+                    'direccion' => $direccion->detalleDireccion->direccion,
+                    'latitud' => $direccion->detalleDireccion->latitud,
+                    'longitud' => $direccion->detalleDireccion->longitud,
+                ],
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Dirección no encontrada para el pedido'
+        ]);
     }
 
 }

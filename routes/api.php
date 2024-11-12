@@ -54,6 +54,8 @@ use App\Http\Controllers\AuthController;
         Route::put('/admin/pedidos/{idPedido}', [AdminController::class, 'updateOrderStatus']);
         Route::delete('/admin/pedidos/{idPedido}', [AdminController::class, 'deleteOrder']);
         Route::get('/pagos/comprobante/{userId}/{pagoId}/{filename}', [AdminController::class, 'verComprobante']);
+
+        Route::get('/obtenerDireccionPedido/{idPedido}', [AdminController::class, 'obtenerDireccionPedido']);
     });
 
     // RUTAS PARA CLIENTE VALIDADA POR MIDDLEWARE AUTH (PARA TOKEN JWT) Y CHECKROLE (PARA VALIDAR ROL DEL TOKEN)
@@ -77,6 +79,15 @@ use App\Http\Controllers\AuthController;
     
         Route::get('/carrito/cantidad', [ClienteController::class, 'obtenerCantidadCarrito']);
         Route::post('/pedidos/cantidad', [ClienteController::class, 'obtenerCantidadPedidos']);
+
+
+        Route::get('/listarDireccion/{idUsuario}', [ClienteController::class, 'listarDireccion']);
+        Route::post('/agregarDireccion', [ClienteController::class, 'agregarDireccion']);
+        Route::put('/actualizarDireccion/{id}', [ClienteController::class, 'actualizarDireccion']);
+        Route::delete('/eliminarDireccion/{id}', [ClienteController::class, 'eliminarDireccion']);
+        Route::put('/setDireccionUsando/{idDireccion}', [ClienteController::class, 'setDireccionUsando']);
+
+        Route::get('/obtenerDireccionPedidoUser/{idPedido}', [AdminController::class, 'obtenerDireccionPedido']);
     });
 
 //================================================================================================

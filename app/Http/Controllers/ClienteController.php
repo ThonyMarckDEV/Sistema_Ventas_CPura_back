@@ -8,8 +8,7 @@ use App\Models\CarritoDetalle;
 use Illuminate\Http\Request;
 use App\Models\Producto;
 use App\Models\Pedido;
-use App\Models\PedidoDetalle;
-use App\Models\Pago;
+use App\Models\DetalleDireccion;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
@@ -280,17 +279,19 @@ class ClienteController extends Controller
         DB::beginTransaction();
 
         try {
-            // Validar los datos de la solicitud (sin `metodo_pago`)
+            // Validar los datos de la solicitud, incluyendo `idDireccion`
             $request->validate([
                 'idUsuario' => 'required|integer',
                 'idCarrito' => 'required|integer',
                 'total' => 'required|numeric',
+                'idDireccion' => 'required|integer|exists:detalle_direcciones,idDireccion',
             ]);
 
             // Obtener los datos de la solicitud
             $idUsuario = $request->input('idUsuario');
             $idCarrito = $request->input('idCarrito');
             $total = $request->input('total');
+            $idDireccion = $request->input('idDireccion'); // ID de la dirección en uso
             $estadoPedido = 'pendiente';
             $estadoPago = 'pendiente';
 
@@ -299,6 +300,12 @@ class ClienteController extends Controller
                 'idUsuario' => $idUsuario,
                 'total' => $total,
                 'estado' => $estadoPedido,
+            ]);
+
+            // Guardar la dirección del pedido en 'detalle_direccion_pedido'
+            DB::table('detalle_direccion_pedido')->insert([
+                'idPedido' => $pedidoId,
+                'idDireccion' => $idDireccion,
             ]);
 
             // Obtener los detalles del carrito desde 'carrito_detalle'
@@ -355,7 +362,7 @@ class ClienteController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Pedido y pago creados exitosamente.',
+                'message' => 'Pedido y pago creados exitosamente con dirección asignada.',
                 'idPedido' => $pedidoId,
             ], 201);
 
@@ -553,5 +560,45 @@ class ClienteController extends Controller
         return response()->json(['success' => true, 'cantidad' => $cantidadPedidos]);
     }
 
+    public function listarDireccion($idUsuario)
+    {
+        $direcciones = DetalleDireccion::where('idUsuario', $idUsuario)->get();
+        return response()->json($direcciones);
+    }
+
+    public function agregarDireccion(Request $request)
+    {
+        $direccion = DetalleDireccion::create($request->all());
+        return response()->json($direccion, 201);
+    }
+
+    public function actualizarDireccion(Request $request, $id)
+    {
+        $direccion = DetalleDireccion::findOrFail($id);
+        $direccion->update($request->all());
+        return response()->json($direccion);
+    }
+
+    public function eliminarDireccion($id)
+    {
+        DetalleDireccion::destroy($id);
+        return response()->json(['message' => 'Dirección eliminada con éxito.']);
+    }
+
+
+    public function setDireccionUsando($idDireccion)
+    {
+        // Encuentra la dirección seleccionada y el usuario al que pertenece
+        $direccion = DetalleDireccion::findOrFail($idDireccion);
+        $idUsuario = $direccion->idUsuario;
+
+        // Cambia todas las direcciones del usuario a "no usando"
+        DetalleDireccion::where('idUsuario', $idUsuario)->update(['estado' => 'no usando']);
+
+        // Marca la dirección seleccionada como "usando"
+        $direccion->update(['estado' => 'usando']);
+
+        return response()->json(['message' => 'Dirección actualizada a usando.']);
+    }
 
 }

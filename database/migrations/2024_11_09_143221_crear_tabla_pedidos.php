@@ -10,7 +10,7 @@ class CrearTablaPedidos extends Migration
     public function up()
     {
         Schema::create('pedidos', function (Blueprint $table) {
-            $table->id('idPedido');
+            $table->id('idPedido')->unsigned();;
             $table->unsignedBigInteger('idUsuario');
             $table->decimal('total', 10, 2);
             $table->enum('estado', ['pendiente', 'aprobando', 'en preparacion', 'enviado', 'completado'])->default('pendiente');
