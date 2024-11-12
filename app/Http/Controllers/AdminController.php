@@ -6,6 +6,9 @@ use App\Models\Usuario;
 use App\Models\Categoria;
 use App\Models\Producto;
 use App\Models\Carrito;
+use App\Models\Pedido;
+use App\Models\Pago;
+use App\Models\PedidoDetalle;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
@@ -316,4 +319,98 @@ public function listarProductos()
           ]);
       }
     
+
+      public function getAllOrders()
+    {
+        $orders = Pedido::with(['usuario', 'pagos', 'detalles.producto'])
+            ->where('estado', '<>', 'completado')
+            ->get();
+
+        return response()->json(['success' => true, 'orders' => $orders]);
+    }
+
+      public function updatePaymentStatus(Request $request, $idPago)
+      {
+          $estado_pago = $request->input('estado_pago');
+          $idPedido = $request->input('idPedido');
+      
+          $pago = Pago::find($idPago);
+      
+          if (!$pago) {
+              return response()->json(['success' => false, 'message' => 'Pago no encontrado'], 404);
+          }
+      
+          // Actualizar el estado de pago
+          $pago->estado_pago = $estado_pago;
+          $pago->save();
+      
+          // Si el estado es "completado", descontar el stock
+          if ($estado_pago === 'completado') {
+              $pedido = Pedido::with('detalles')->find($idPedido);
+      
+              if ($pedido) {
+                  foreach ($pedido->detalles as $detalle) {
+                      $producto = Producto::find($detalle->idProducto);
+                      if ($producto) {
+                          $producto->stock -= $detalle->cantidad;
+                          $producto->save();
+                      }
+                  }
+              }
+          }
+      
+          return response()->json(['success' => true, 'message' => 'Estado de pago actualizado']);
+      }
+
+
+    public function updateOrderStatus(Request $request, $idPedido)
+    {
+        $estado = $request->input('estado');
+
+        $pedido = Pedido::find($idPedido);
+
+        if (!$pedido) {
+            return response()->json(['success' => false, 'message' => 'Pedido no encontrado'], 404);
+        }
+
+        $pedido->estado = $estado;
+        $pedido->save();
+
+        return response()->json(['success' => true, 'message' => 'Estado del pedido actualizado']);
+    }
+
+    public function verComprobante($userId, $pagoId, $filename)
+    {
+        $path = storage_path("pagos/comprobante/{$userId}/{$pagoId}/{$filename}");
+
+        if (!File::exists($path)) {
+            abort(404);
+        }
+
+        $file = File::get($path);
+        $type = File::mimeType($path);
+
+        return Response::make($file, 200)->header("Content-Type", $type);
+    }
+
+    public function deleteOrder($idPedido)
+    {
+        $pedido = Pedido::find($idPedido);
+
+        if (!$pedido) {
+            return response()->json(['success' => false, 'message' => 'Pedido no encontrado'], 404);
+        }
+
+        // Eliminar los detalles del pedido
+        $pedido->detalles()->delete();
+
+        // Eliminar los pagos asociados
+        $pedido->pagos()->delete();
+
+        // Eliminar el pedido
+        $pedido->delete();
+
+        return response()->json(['success' => true, 'message' => 'Pedido eliminado correctamente']);
+    }
+
 }

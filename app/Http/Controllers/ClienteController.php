@@ -504,10 +504,7 @@ class ClienteController extends Controller
              DB::table('pedidos')
                  ->where('idPedido', $idPedido)
                  ->update(['estado' => 'aprobando']);
-     
-             // Eliminar los registros en 'pedido_detalle' correspondientes al 'idPedido'
-             DB::table('pedido_detalle')->where('idPedido', $idPedido)->delete();
-     
+          
              // Confirmar la transacción
              DB::commit();
              return response()->json(['success' => true, 'message' => 'Pago procesado exitosamente.', 'ruta_comprobante' => $rutaComprobante], 200);
@@ -539,20 +536,22 @@ class ClienteController extends Controller
 
 
      public function obtenerCantidadPedidos(Request $request)
-     {
-         // Obtener el idUsuario desde el token JWT en el frontend
-         $idUsuario = $request->input('idUsuario');
- 
-         if (!$idUsuario) {
-             return response()->json(['success' => false, 'message' => 'idUsuario no proporcionado'], 400);
-         }
- 
-         // Consulta la cantidad de pedidos del usuario
-         $cantidadPedidos = DB::table('pedidos')
-             ->where('idUsuario', $idUsuario)
-             ->count();
- 
-         return response()->json(['cantidad' => $cantidadPedidos]);
-     }
+    {
+        // Obtener el idUsuario desde el token JWT en el frontend
+        $idUsuario = $request->input('idUsuario');
+
+        if (!$idUsuario) {
+            return response()->json(['success' => false, 'message' => 'idUsuario no proporcionado'], 400);
+        }
+
+        // Consulta la cantidad de pedidos del usuario, excluyendo los completados
+        $cantidadPedidos = DB::table('pedidos')
+            ->where('idUsuario', $idUsuario)
+            ->where('estado', '!=', 'completado') // Excluir pedidos con estado 'completado'
+            ->count();
+
+        return response()->json(['success' => true, 'cantidad' => $cantidadPedidos]);
+    }
+
 
 }

@@ -21,19 +21,22 @@ class Pedido extends Model
         'estado',
     ];
 
-    public function usuario()
-    {
-        return $this->belongsTo(Usuario::class, 'idUsuario');
-    }
+     // Relación con el modelo Usuario
+     public function usuario()
+     {
+         return $this->belongsTo(Usuario::class, 'idUsuario', 'idUsuario');
+     }
+ 
 
     public function carrito()
     {
         return $this->belongsTo(Carrito::class, 'idCarrito');
     }
 
-    public function pago()
+    // Relación con Pagos
+    public function pagos()
     {
-        return $this->hasOne(Pago::class, 'idPedido');
+        return $this->hasMany(Pago::class, 'idPedido', 'idPedido');
     }
 
     public function detalles()

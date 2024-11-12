@@ -11,6 +11,8 @@ class Pago extends Model
     use HasFactory;
 
     protected $table = 'pagos';
+    
+    protected $primaryKey = 'idPago'; // Especifica la clave primaria
 
     public $timestamps = false;
 
@@ -24,6 +26,7 @@ class Pago extends Model
 
     public function pedido()
     {
-        return $this->belongsTo(Pedido::class, 'idPedido');
+        return $this->belongsTo(Pedido::class, 'idPedido', 'idPedido');
     }
+
 }

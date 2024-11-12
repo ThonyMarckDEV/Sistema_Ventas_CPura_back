@@ -54,4 +54,10 @@ class Usuario extends Authenticatable implements JWTSubject
     {
         return $this->hasOne(Carrito::class, 'idUsuario', 'idUsuario');
     }
+
+     // Relaciones
+     public function pedidos()
+     {
+         return $this->hasMany(Pedido::class, 'idUsuario', 'idUsuario');
+     }
 }

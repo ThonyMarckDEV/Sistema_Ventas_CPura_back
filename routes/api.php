@@ -46,6 +46,12 @@ use App\Http\Controllers\AuthController;
         Route::post('/agregarCategoria', [AdminController::class, 'agregarCategoria']);
         Route::put('/actualizarCategoria/{id}', [AdminController::class, 'actualizarCategoria']);
         Route::delete('/eliminarCategoria/{id}', [AdminController::class, 'eliminarCategoria']);
+   
+        Route::get('/admin/pedidos', [AdminController::class, 'getAllOrders']);
+        Route::put('/admin/pagos/{idPago}', [AdminController::class, 'updatePaymentStatus']);
+        Route::put('/admin/pedidos/{idPedido}', [AdminController::class, 'updateOrderStatus']);
+        Route::delete('/admin/pedidos/{idPedido}', [AdminController::class, 'deleteOrder']);
+        Route::get('/pagos/comprobante/{userId}/{pagoId}/{filename}', [AdminController::class, 'verComprobante']);
     });
 
     // RUTAS PARA CLIENTE VALIDADA POR MIDDLEWARE AUTH (PARA TOKEN JWT) Y CHECKROLE (PARA VALIDAR ROL DEL TOKEN)
