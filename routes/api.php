@@ -27,6 +27,8 @@ use App\Http\Controllers\AuthController;
         Route::get('/listarProductos', [AdminController::class, 'listarProductos']);
 
         Route::post('/registerUser', [ClienteController::class, 'registerUser']);
+
+        Route::post('/check-status', [AuthController::class, 'checkStatus']);
 //================================================================================================
 
 
