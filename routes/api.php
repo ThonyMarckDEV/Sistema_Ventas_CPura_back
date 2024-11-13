@@ -64,7 +64,13 @@ use App\Http\Controllers\AuthController;
         Route::get('/reportes/total-productos', [AdminController::class, 'totalProductos']);
         Route::get('/reportes/productos-bajo-stock', [AdminController::class, 'productosBajoStock']);
         Route::get('/reportes/pagos-completados', [AdminController::class, 'obtenerPagosCompletados']);
+
+        Route::post('/admin/pedidos/cantidad', [AdminController::class, 'obtenerCantidadPedidosAdmin']);
     });
+
+
+
+
 
     // RUTAS PARA CLIENTE VALIDADA POR MIDDLEWARE AUTH (PARA TOKEN JWT) Y CHECKROLE (PARA VALIDAR ROL DEL TOKEN)
     Route::middleware(['auth.jwt', 'checkRoleMW:cliente'])->group(function () {

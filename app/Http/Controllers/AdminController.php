@@ -10,9 +10,12 @@ use App\Models\Pedido;
 use App\Models\Pago;
 use App\Models\DetalleDireccionPedido;
 use Illuminate\Http\Request;
+use App\Mail\NotificacionPagoCompletado;
+use App\Mail\NotificacionPedidoEliminado;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 
 class AdminController extends Controller
 {
@@ -329,38 +332,65 @@ public function listarProductos()
         return response()->json(['success' => true, 'orders' => $orders]);
     }
 
-      public function updatePaymentStatus(Request $request, $idPago)
-      {
-          $estado_pago = $request->input('estado_pago');
-          $idPedido = $request->input('idPedido');
-      
-          $pago = Pago::find($idPago);
-      
-          if (!$pago) {
-              return response()->json(['success' => false, 'message' => 'Pago no encontrado'], 404);
-          }
-      
-          // Actualizar el estado de pago
-          $pago->estado_pago = $estado_pago;
-          $pago->save();
-      
-          // Si el estado es "completado", descontar el stock
-          if ($estado_pago === 'completado') {
-              $pedido = Pedido::with('detalles')->find($idPedido);
-      
-              if ($pedido) {
-                  foreach ($pedido->detalles as $detalle) {
-                      $producto = Producto::find($detalle->idProducto);
-                      if ($producto) {
-                          $producto->stock -= $detalle->cantidad;
-                          $producto->save();
-                      }
-                  }
-              }
-          }
-      
-          return response()->json(['success' => true, 'message' => 'Estado de pago actualizado']);
-      }
+    public function updatePaymentStatus(Request $request, $idPago)
+    {
+        $estado_pago = $request->input('estado_pago');
+        $idPedido = $request->input('idPedido');
+    
+        $pago = Pago::find($idPago);
+    
+        if (!$pago) {
+            return response()->json(['success' => false, 'message' => 'Pago no encontrado'], 404);
+        }
+    
+        // Actualizar el estado de pago
+        $pago->estado_pago = $estado_pago;
+        $pago->save();
+    
+        // Si el estado es "completado", descontar el stock y enviar el correo
+        if ($estado_pago === 'completado') {
+            $pedido = Pedido::with('detalles')->find($idPedido);
+    
+            if ($pedido) {
+                foreach ($pedido->detalles as $detalle) {
+                    $producto = Producto::find($detalle->idProducto);
+                    if ($producto) {
+                        $producto->stock -= $detalle->cantidad;
+                        $producto->save();
+                    }
+                }
+    
+                // Obtener el nombre completo del usuario y los detalles del pedido
+                $usuario = Usuario::find($pedido->idUsuario);
+                if ($usuario) {
+                    $nombreCompleto = $usuario->nombres . ' ' . $usuario->apellidos;
+    
+                    // Preparar los detalles del pedido para el correo
+                    $detallesPedido = [];
+                    $total = 0;
+    
+                    foreach ($pedido->detalles as $detalle) {
+                        $producto = Producto::find($detalle->idProducto);
+                        $detallesPedido[] = [
+                            'producto' => $producto ? $producto->nombreProducto : 'Producto no encontrado',
+                            'cantidad' => $detalle->cantidad,
+                            'subtotal' => $detalle->subtotal,
+                        ];
+                        $total += $detalle->subtotal;
+                    }
+    
+                    // Enviar el correo con los detalles
+                    Mail::to($usuario->correo)->send(new NotificacionPagoCompletado(
+                        $nombreCompleto,
+                        $detallesPedido,
+                        $total
+                    ));
+                }
+            }
+        }
+    
+        return response()->json(['success' => true, 'message' => 'Estado de pago actualizado']);
+    }
 
 
     public function updateOrderStatus(Request $request, $idPedido)
@@ -393,25 +423,41 @@ public function listarProductos()
         return Response::make($file, 200)->header("Content-Type", $type);
     }
 
-    public function deleteOrder($idPedido)
-    {
-        $pedido = Pedido::find($idPedido);
 
-        if (!$pedido) {
-            return response()->json(['success' => false, 'message' => 'Pedido no encontrado'], 404);
+        public function deleteOrder($idPedido)
+        {
+            $pedido = Pedido::find($idPedido);
+
+            if (!$pedido) {
+                return response()->json(['success' => false, 'message' => 'Pedido no encontrado'], 404);
+            }
+
+            // Obtener el usuario asociado al pedido
+            $usuario = Usuario::find($pedido->idUsuario);
+            if ($usuario) {
+                $nombreCompleto = $usuario->nombres . ' ' . $usuario->apellidos;
+            }
+
+            // Eliminar los detalles del pedido
+            $pedido->detalles()->delete();
+
+            // Eliminar los pagos asociados
+            $pedido->pagos()->delete();
+
+            // Eliminar el pedido
+            $pedido->delete();
+
+            // Enviar el correo de notificación al usuario
+            if ($usuario) {
+                Mail::to($usuario->correo)->send(new NotificacionPedidoEliminado(
+                    $nombreCompleto,
+                    $idPedido
+                ));
+            }
+
+            return response()->json(['success' => true, 'message' => 'Pedido eliminado correctamente']);
         }
 
-        // Eliminar los detalles del pedido
-        $pedido->detalles()->delete();
-
-        // Eliminar los pagos asociados
-        $pedido->pagos()->delete();
-
-        // Eliminar el pedido
-        $pedido->delete();
-
-        return response()->json(['success' => true, 'message' => 'Pedido eliminado correctamente']);
-    }
 
     public function obtenerDireccionPedido($idPedido)
     {
@@ -496,6 +542,16 @@ public function listarProductos()
         ]);
     }
 
+
+    public function obtenerCantidadPedidosAdmin(Request $request)
+    {
+        // Filtra los pedidos que no estén en estado 'completado'
+        $cantidadPedidos = DB::table('pedidos')
+            ->whereIn('estado', ['pendiente', 'aprobando', 'en preparacion', 'enviado'])
+            ->count();
+
+        return response()->json(['success' => true, 'cantidad' => $cantidadPedidos]);
+    }
 
     
 }
