@@ -12,7 +12,7 @@ use App\Models\DetalleDireccionPedido;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
-
+use Illuminate\Support\Facades\DB;
 
 class AdminController extends Controller
 {
@@ -438,4 +438,55 @@ public function listarProductos()
         ]);
     }
 
+
+    //FUNCIONES PARA REPORTES
+
+    public function totalVentasCompletadas()
+    {
+        $totalVentas = DB::table('pagos')
+            ->where('estado_pago', 'completado')
+            ->sum('monto');
+
+        return response()->json(['totalVentas' => $totalVentas], 200);
+    }
+
+
+    public function totalPedidosCompletados()
+    {
+        $totalPedidos = DB::table('pedidos')
+            ->where('estado', 'completado')
+            ->count();
+
+        return response()->json(['totalPedidos' => $totalPedidos], 200);
+    }
+
+
+    public function totalClientes()
+    {
+        $totalClientes = DB::table('usuarios')
+            ->where('rol', 'cliente')
+            ->count();
+
+        return response()->json(['totalClientes' => $totalClientes], 200);
+    }
+
+    public function totalProductos()
+    {
+        $totalProductos = DB::table('productos')->count();
+
+        return response()->json(['totalProductos' => $totalProductos], 200);
+    }
+
+    public function productosBajoStock()
+    {
+        $productos = DB::table('productos')
+            ->where('stock', '<', 10)
+            ->select('nombreProducto', 'stock')
+            ->get();
+
+        return response()->json(['productosBajoStock' => $productos], 200);
+    }
+
+
+    
 }

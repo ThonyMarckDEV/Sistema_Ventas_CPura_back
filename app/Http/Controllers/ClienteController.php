@@ -21,15 +21,15 @@ class ClienteController extends Controller
     public function registerUser(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'username' => 'required|string|unique:usuarios,username',
-            'rol' => 'required|string',
-            'nombres' => 'required|string',
-            'apellidos' => 'required|string',
-            'dni' => 'required|string',
-            'correo' => 'required|email|unique:usuarios,correo',
-            'telefono' => 'required|string',
-            'password' => 'required|string',
-            'edad' => 'required|integer',
+            'username' => 'required|string|max:50|unique:usuarios,username',  // Limita el tamaño del username
+            'rol' => 'required|string|in:admin,cliente', // Especifica roles válidos
+            'nombres' => 'required|string|max:100',
+            'apellidos' => 'required|string|max:100',
+            'dni' => 'required|string|size:8|regex:/^\d{8}$/', // Acepta solo números con 8 dígitos
+            'correo' => 'required|email|max:255|unique:usuarios,correo',
+            'telefono' => 'required|string|max:9|regex:/^\d+$/', // Acepta solo números y limita la longitud
+            'password' => 'required|string|min:8|max:255', // Mínimo 8 caracteres para mayor seguridad
+            'edad' => 'required|integer|min:1|max:120', // Edad mínima y máxima
         ]);
 
         if ($validator->fails()) {
@@ -310,14 +310,11 @@ class ClienteController extends Controller
      }
 
 
-     
      public function crearPedido(Request $request)
     {
-        // Iniciar una transacción para asegurar la integridad de las operaciones
         DB::beginTransaction();
 
         try {
-            // Validar los datos de la solicitud, incluyendo `idDireccion`
             $request->validate([
                 'idUsuario' => 'required|integer',
                 'idCarrito' => 'required|integer',
@@ -325,28 +322,25 @@ class ClienteController extends Controller
                 'idDireccion' => 'required|integer|exists:detalle_direcciones,idDireccion',
             ]);
 
-            // Obtener los datos de la solicitud
             $idUsuario = $request->input('idUsuario');
             $idCarrito = $request->input('idCarrito');
             $total = $request->input('total');
-            $idDireccion = $request->input('idDireccion'); // ID de la dirección en uso
+            $idDireccion = $request->input('idDireccion');
             $estadoPedido = 'pendiente';
             $estadoPago = 'pendiente';
 
-            // Crear el pedido en la tabla 'pedidos'
+            // Crear el pedido
             $pedidoId = DB::table('pedidos')->insertGetId([
                 'idUsuario' => $idUsuario,
                 'total' => $total,
                 'estado' => $estadoPedido,
             ]);
 
-            // Guardar la dirección del pedido en 'detalle_direccion_pedido'
             DB::table('detalle_direccion_pedido')->insert([
                 'idPedido' => $pedidoId,
                 'idDireccion' => $idDireccion,
             ]);
 
-            // Obtener los detalles del carrito desde 'carrito_detalle'
             $detallesCarrito = DB::table('carrito_detalle')
                 ->where('idCarrito', $idCarrito)
                 ->get();
@@ -355,20 +349,12 @@ class ClienteController extends Controller
                 throw new \Exception('El carrito está vacío.');
             }
 
-            // Recorrer cada detalle del carrito para insertar en 'pedido_detalle'
             foreach ($detallesCarrito as $detalle) {
                 $producto = DB::table('productos')->where('idProducto', $detalle->idProducto)->first();
-
-                if (!$producto) {
-                    throw new \Exception("Producto con ID {$detalle->idProducto} no encontrado.");
-                }
-
-                // Verificar stock suficiente
-                if ($producto->stock < $detalle->cantidad) {
+                if (!$producto || $producto->stock < $detalle->cantidad) {
                     throw new \Exception("Stock insuficiente para el producto: {$producto->nombreProducto}.");
                 }
 
-                // Calcular subtotal y guardar el detalle del pedido
                 $subtotal = $detalle->cantidad * $detalle->precio;
                 DB::table('pedido_detalle')->insert([
                     'idPedido' => $pedidoId,
@@ -379,8 +365,15 @@ class ClienteController extends Controller
                 ]);
             }
 
-            // Insertar en la tabla 'pagos' solo si se proporciona un método de pago y comprobante
-            if ($request->has('metodo_pago') && $request->file('comprobante')) {
+            // Registrar el pago, incluyendo efectivo sin comprobante
+            if ($request->input('metodo_pago') === 'efectivo') {
+                DB::table('pagos')->insert([
+                    'idPedido' => $pedidoId,
+                    'monto' => $total,
+                    'estado_pago' => 'confirmado',
+                    'metodo_pago' => 'efectivo',
+                ]);
+            } elseif ($request->has('metodo_pago') && $request->file('comprobante')) {
                 DB::table('pagos')->insert([
                     'idPedido' => $pedidoId,
                     'monto' => $total,
@@ -390,12 +383,8 @@ class ClienteController extends Controller
                 ]);
             }
 
-            // Borrar los productos del carrito desde 'carrito_detalle'
-            DB::table('carrito_detalle')
-                ->where('idCarrito', $idCarrito)
-                ->delete();
+            DB::table('carrito_detalle')->where('idCarrito', $idCarrito)->delete();
 
-            // Confirmar la transacción
             DB::commit();
 
             return response()->json([
@@ -636,7 +625,7 @@ class ClienteController extends Controller
             }
     
             // Eliminar la dirección si no hay pedidos restringidos
-            DB::table('direcciones')->where('idDireccion', $idDireccion)->delete();
+            DB::table('detalle_direcciones')->where('idDireccion', $idDireccion)->delete();
     
             return response()->json([
                 'success' => true,
