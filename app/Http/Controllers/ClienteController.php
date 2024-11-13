@@ -14,7 +14,17 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
-
+use App\Mail\NotificacionCrearCuenta;
+use App\Mail\NotificacionActualizarCorreo;
+use App\Mail\NotificacionPedido;
+use App\Mail\NotificacionPagoProcesado;
+use App\Mail\NotificacionDireccionAgregada;
+use App\Mail\NotificacionDireccionEliminada;
+use App\Mail\NotificacionDireccionPredeterminada;
+use App\Mail\CodigoVerificacion;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Mail;
 
 class ClienteController extends Controller
 {
@@ -52,8 +62,9 @@ class ClienteController extends Controller
                 'telefono' => $request->telefono,
                 'password' => bcrypt($request->password),
                 'edad' => $request->edad,
-                'status' => 'loggedOff', // Establece el status por defecto
+                'status' => 'loggedOff' // Establece el status por defecto
             ]);
+        
 
             // Crear el carrito solo si el rol es cliente
             if ($request->rol === 'cliente') {
@@ -61,6 +72,13 @@ class ClienteController extends Controller
                     'idUsuario' => $user->idUsuario
                 ]);
             }
+
+              // Definir los datos de correo
+               $email = $request->correo;
+               $mensaje = 'Has creado satisfactoriamente tu cuenta en Cpura.';
+                
+                // Enviar el correo
+                Mail::to($email)->send(new NotificacionCrearCuenta($mensaje));
 
             return response()->json(['success' => true, 'message' => 'Usuario registrado exitosamente'], 201);
 
@@ -127,22 +145,37 @@ class ClienteController extends Controller
         return response()->json(['success' => false, 'message' => 'No se cargó la imagen'], 400);
     }
 
+
     public function updateCliente(Request $request, $idUsuario)
     {
         $docente = Usuario::find($idUsuario);
         if (!$docente || $docente->rol !== 'cliente') {
             return response()->json(['success' => false, 'message' => 'Cliente no encontrado'], 404);
         }
-
+    
+        // Verificar si el nuevo correo ya está en uso por otro usuario
+        $nuevoCorreo = $request->input('correo');
+        if ($nuevoCorreo && $nuevoCorreo !== $docente->correo) {
+            $correoExistente = Usuario::where('correo', $nuevoCorreo)->where('idUsuario', '!=', $idUsuario)->exists();
+            if ($correoExistente) {
+                return response()->json(['success' => false, 'message' => 'El correo ya está en uso'], 400);
+            }
+        }
+    
+        // Actualizar los datos del usuario
         $docente->update($request->only([
             'nombres', 'apellidos', 'dni', 'correo', 'edad', 'nacimiento',
             'sexo', 'direccion', 'telefono', 'departamento'
         ]));
-
+    
+        // Enviar correo al nuevo correo si el correo ha cambiado
+        if ($nuevoCorreo && $nuevoCorreo !== $docente->correo) {
+            $mensaje = 'Tu dirección de correo electrónico ha sido actualizada correctamente en Cpura.';
+            Mail::to($nuevoCorreo)->send(new NotificacionActualizarCorreo($mensaje));
+        }
+    
         return response()->json(['success' => true, 'message' => 'Datos actualizados correctamente']);
     }
-
-    // En tu controlador, por ejemplo ProductoController.php
 
     public function listarProductos()
     {
@@ -311,98 +344,111 @@ class ClienteController extends Controller
 
 
      public function crearPedido(Request $request)
-    {
-        DB::beginTransaction();
-
-        try {
-            $request->validate([
-                'idUsuario' => 'required|integer',
-                'idCarrito' => 'required|integer',
-                'total' => 'required|numeric',
-                'idDireccion' => 'required|integer|exists:detalle_direcciones,idDireccion',
-            ]);
-
-            $idUsuario = $request->input('idUsuario');
-            $idCarrito = $request->input('idCarrito');
-            $total = $request->input('total');
-            $idDireccion = $request->input('idDireccion');
-            $estadoPedido = 'pendiente';
-            $estadoPago = 'pendiente';
-
-            // Crear el pedido
-            $pedidoId = DB::table('pedidos')->insertGetId([
-                'idUsuario' => $idUsuario,
-                'total' => $total,
-                'estado' => $estadoPedido,
-            ]);
-
-            DB::table('detalle_direccion_pedido')->insert([
-                'idPedido' => $pedidoId,
-                'idDireccion' => $idDireccion,
-            ]);
-
-            $detallesCarrito = DB::table('carrito_detalle')
-                ->where('idCarrito', $idCarrito)
-                ->get();
-
-            if ($detallesCarrito->isEmpty()) {
-                throw new \Exception('El carrito está vacío.');
-            }
-
-            foreach ($detallesCarrito as $detalle) {
-                $producto = DB::table('productos')->where('idProducto', $detalle->idProducto)->first();
-                if (!$producto || $producto->stock < $detalle->cantidad) {
-                    throw new \Exception("Stock insuficiente para el producto: {$producto->nombreProducto}.");
-                }
-
-                $subtotal = $detalle->cantidad * $detalle->precio;
-                DB::table('pedido_detalle')->insert([
-                    'idPedido' => $pedidoId,
-                    'idProducto' => $detalle->idProducto,
-                    'cantidad' => $detalle->cantidad,
-                    'precioUnitario' => $detalle->precio,
-                    'subtotal' => $subtotal,
-                ]);
-            }
-
-            // Registrar el pago, incluyendo efectivo sin comprobante
-            if ($request->input('metodo_pago') === 'efectivo') {
-                DB::table('pagos')->insert([
-                    'idPedido' => $pedidoId,
-                    'monto' => $total,
-                    'estado_pago' => 'confirmado',
-                    'metodo_pago' => 'efectivo',
-                ]);
-            } elseif ($request->has('metodo_pago') && $request->file('comprobante')) {
-                DB::table('pagos')->insert([
-                    'idPedido' => $pedidoId,
-                    'monto' => $total,
-                    'estado_pago' => $estadoPago,
-                    'metodo_pago' => $request->input('metodo_pago'),
-                    'comprobante' => $request->file('comprobante')->store('comprobantes', 'public')
-                ]);
-            }
-
-            DB::table('carrito_detalle')->where('idCarrito', $idCarrito)->delete();
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Pedido y pago creados exitosamente con dirección asignada.',
-                'idPedido' => $pedidoId,
-            ], 201);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Error al crear pedido y pago: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Error al crear el pedido y el pago.',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
-    }
+     {
+         DB::beginTransaction();
+     
+         try {
+             $request->validate([
+                 'idUsuario' => 'required|integer',
+                 'idCarrito' => 'required|integer',
+                 'total' => 'required|numeric',
+                 'idDireccion' => 'required|integer|exists:detalle_direcciones,idDireccion',
+             ]);
+     
+             $idUsuario = $request->input('idUsuario');
+             $idCarrito = $request->input('idCarrito');
+             $total = $request->input('total');
+             $idDireccion = $request->input('idDireccion');
+             $estadoPedido = 'pendiente';
+             $estadoPago = 'pendiente';
+     
+             // Crear el pedido
+             $pedidoId = DB::table('pedidos')->insertGetId([
+                 'idUsuario' => $idUsuario,
+                 'total' => $total,
+                 'estado' => $estadoPedido,
+             ]);
+     
+             DB::table('detalle_direccion_pedido')->insert([
+                 'idPedido' => $pedidoId,
+                 'idDireccion' => $idDireccion,
+             ]);
+     
+             $detallesCarrito = DB::table('carrito_detalle')
+                 ->where('idCarrito', $idCarrito)
+                 ->get();
+     
+             if ($detallesCarrito->isEmpty()) {
+                 throw new \Exception('El carrito está vacío.');
+             }
+     
+             $productos = [];
+             foreach ($detallesCarrito as $detalle) {
+                 $producto = DB::table('productos')->where('idProducto', $detalle->idProducto)->first();
+                 if (!$producto || $producto->stock < $detalle->cantidad) {
+                     throw new \Exception("Stock insuficiente para el producto: {$producto->nombreProducto}.");
+                 }
+     
+                 $subtotal = $detalle->cantidad * $detalle->precio;
+                 DB::table('pedido_detalle')->insert([
+                     'idPedido' => $pedidoId,
+                     'idProducto' => $detalle->idProducto,
+                     'cantidad' => $detalle->cantidad,
+                     'precioUnitario' => $detalle->precio,
+                     'subtotal' => $subtotal,
+                 ]);
+     
+                 // Agregar a la lista de productos para el correo
+                 $productos[] = (object) [
+                     'nombreProducto' => $producto->nombreProducto,
+                     'cantidad' => $detalle->cantidad,
+                     'precioUnitario' => $detalle->precio,
+                     'subtotal' => $subtotal,
+                 ];
+             }
+     
+             // Registrar el pago, incluyendo efectivo sin comprobante
+             if ($request->input('metodo_pago') === 'efectivo') {
+                 DB::table('pagos')->insert([
+                     'idPedido' => $pedidoId,
+                     'monto' => $total,
+                     'estado_pago' => 'confirmado',
+                     'metodo_pago' => 'efectivo',
+                 ]);
+             } elseif ($request->has('metodo_pago') && $request->file('comprobante')) {
+                 DB::table('pagos')->insert([
+                     'idPedido' => $pedidoId,
+                     'monto' => $total,
+                     'estado_pago' => $estadoPago,
+                     'metodo_pago' => $request->input('metodo_pago'),
+                     'comprobante' => $request->file('comprobante')->store('comprobantes', 'public')
+                 ]);
+             }
+     
+             DB::table('carrito_detalle')->where('idCarrito', $idCarrito)->delete();
+     
+             DB::commit();
+     
+             // Enviar el correo de confirmación al usuario
+             $correoUsuario = DB::table('usuarios')->where('idUsuario', $idUsuario)->value('correo');
+             Mail::to($correoUsuario)->send(new NotificacionPedido($pedidoId, $productos, $total));
+     
+             return response()->json([
+                 'success' => true,
+                 'message' => 'Pedido y pago creados exitosamente con dirección asignada.',
+                 'idPedido' => $pedidoId,
+             ], 201);
+     
+         } catch (\Exception $e) {
+             DB::rollBack();
+             Log::error('Error al crear pedido y pago: ' . $e->getMessage());
+             return response()->json([
+                 'success' => false,
+                 'message' => 'Error al crear el pedido y el pago.',
+                 'error' => $e->getMessage(),
+             ], 500);
+         }
+     }
         
      
      public function showBoleta($idPedido)
@@ -541,6 +587,11 @@ class ClienteController extends Controller
           
              // Confirmar la transacción
              DB::commit();
+     
+             // Enviar correo de confirmación al usuario
+             $correoUsuario = DB::table('usuarios')->where('idUsuario', $pedido->idUsuario)->value('correo');
+             Mail::to($correoUsuario)->send(new NotificacionPagoProcesado($idPedido));
+     
              return response()->json(['success' => true, 'message' => 'Pago procesado exitosamente.', 'ruta_comprobante' => $rutaComprobante], 200);
      
          } catch (\Exception $e) {
@@ -596,46 +647,45 @@ class ClienteController extends Controller
     public function agregarDireccion(Request $request)
     {
         $direccion = DetalleDireccion::create($request->all());
+    
+        // Enviar correo de confirmación
+        $correoUsuario = DB::table('usuarios')->where('idUsuario', $direccion->idUsuario)->value('correo');
+        Mail::to($correoUsuario)->send(new NotificacionDireccionAgregada($direccion));
+    
         return response()->json($direccion, 201);
     }
-
-    public function actualizarDireccion(Request $request, $id)
-    {
-        $direccion = DetalleDireccion::findOrFail($id);
-        $direccion->update($request->all());
-        return response()->json($direccion);
-    }
- 
 
     public function eliminarDireccion($idDireccion)
     {
         try {
-            // Verificar si existen pedidos asociados en estados restringidos
             $estadoRestringido = DB::table('detalle_direccion_pedido')
                 ->join('pedidos', 'detalle_direccion_pedido.idPedido', '=', 'pedidos.idPedido')
                 ->where('detalle_direccion_pedido.idDireccion', $idDireccion)
                 ->whereIn('pedidos.estado', ['pendiente', 'aprobando', 'en preparacion', 'enviado'])
                 ->exists();
-    
+
             if ($estadoRestringido) {
                 return response()->json([
                     'success' => false,
                     'message' => 'No se puede eliminar la dirección: existen pedidos en proceso con esta dirección asignada.',
                 ], 400);
             }
-    
-            // Eliminar la dirección si no hay pedidos restringidos
+
+            // Obtener los datos de la dirección antes de eliminarla
+            $direccion = DB::table('detalle_direcciones')->where('idDireccion', $idDireccion)->first();
             DB::table('detalle_direcciones')->where('idDireccion', $idDireccion)->delete();
-    
+
+            // Enviar correo de confirmación
+            $correoUsuario = DB::table('usuarios')->where('idUsuario', $direccion->idUsuario)->value('correo');
+            Mail::to($correoUsuario)->send(new NotificacionDireccionEliminada($direccion));
+
             return response()->json([
                 'success' => true,
                 'message' => 'Dirección eliminada exitosamente.',
             ], 200);
-    
+
         } catch (\Exception $e) {
-            // Manejo de errores y registro en el log
             Log::error('Error al eliminar la dirección: ' . $e->getMessage());
-    
             return response()->json([
                 'success' => false,
                 'message' => 'Error al eliminar la dirección.',
@@ -646,17 +696,55 @@ class ClienteController extends Controller
 
     public function setDireccionUsando($idDireccion)
     {
-        // Encuentra la dirección seleccionada y el usuario al que pertenece
         $direccion = DetalleDireccion::findOrFail($idDireccion);
         $idUsuario = $direccion->idUsuario;
 
-        // Cambia todas las direcciones del usuario a "no usando"
         DetalleDireccion::where('idUsuario', $idUsuario)->update(['estado' => 'no usando']);
-
-        // Marca la dirección seleccionada como "usando"
         $direccion->update(['estado' => 'usando']);
+
+        // Enviar correo de confirmación
+        $correoUsuario = DB::table('usuarios')->where('idUsuario', $idUsuario)->value('correo');
+        Mail::to($correoUsuario)->send(new NotificacionDireccionPredeterminada($direccion));
 
         return response()->json(['message' => 'Dirección actualizada a usando.']);
     }
+
+
+
+    public function enviarCodigo($idUsuario)
+    {
+        $usuario = Usuario::findOrFail($idUsuario);
+        $codigo = rand(100000, 999999);
+        Cache::put("verificacion_codigo_{$idUsuario}", $codigo, 300); // Expira en 5 minutos
+
+        // Envía el correo electrónico con el código
+        Mail::to($usuario->correo)->send(new CodigoVerificacion($codigo));
+
+        return response()->json(['success' => true]);
+    }
+
+    public function verificarCodigo(Request $request, $idUsuario)
+    {
+        $codigoIngresado = $request->input('code');
+        $codigoAlmacenado = Cache::get("verificacion_codigo_{$idUsuario}");
+
+        if ($codigoAlmacenado && $codigoAlmacenado == $codigoIngresado) {
+            Cache::forget("verificacion_codigo_{$idUsuario}"); // Borra el código después de validarlo
+            return response()->json(['success' => true, 'message' => 'Código verificado correctamente']);
+        }
+
+        return response()->json(['success' => false, 'message' => 'Código incorrecto. Inténtalo nuevamente.']);
+    }
+
+    public function cambiarContrasena(Request $request)
+    {
+        $usuario = $request->user();
+        $usuario->update(['password' => bcrypt($request->input('newPassword'))]);
+
+        Cache::forget("verificacion_{$usuario->id}");
+
+        return response()->json(['success' => true]);
+    }
+
 
 }

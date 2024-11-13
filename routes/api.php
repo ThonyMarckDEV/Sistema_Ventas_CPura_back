@@ -96,6 +96,10 @@ use App\Http\Controllers\AuthController;
         Route::put('/setDireccionUsando/{idDireccion}', [ClienteController::class, 'setDireccionUsando']);
 
         Route::get('/obtenerDireccionPedidoUser/{idPedido}', [AdminController::class, 'obtenerDireccionPedido']);
+
+        Route::post('/enviarCodigo/{idUsuario}', [ClienteController::class, 'enviarCodigo']);
+        Route::post('/verificarCodigo/{idUsuario}', [ClienteController::class, 'verificarCodigo']);
+        Route::post('/cambiarContrasena', [ClienteController::class, 'cambiarContrasena']);
     });
 
 //================================================================================================
