@@ -785,5 +785,32 @@ class ClienteController extends Controller
         return response()->json(['success' => true]);
     }
 
+    public function cancelarPedido(Request $request)
+    {
+        $idPedido = $request->input('idPedido');
+
+        // Validar que el ID esté presente
+        if (!$idPedido) {
+            return response()->json(['error' => 'ID de pedido no proporcionado'], 400);
+        }
+
+        // Buscar el pedido en la base de datos
+        $pedido = Pedido::find($idPedido);
+
+        if (!$pedido) {
+            return response()->json(['error' => 'Pedido no encontrado'], 404);
+        }
+
+        // Verificar si el estado es "pendiente"
+        if ($pedido->estado !== 'pendiente') {
+            return response()->json(['error' => 'Solo se pueden cancelar pedidos pendientes'], 400);
+        }
+
+        // Eliminar el pedido
+        $pedido->delete();
+
+        return response()->json(['message' => 'Pedido cancelado exitosamente'], 200);
+    }
+
 
 }
