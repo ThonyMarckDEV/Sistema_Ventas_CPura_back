@@ -171,26 +171,50 @@ class ClienteController extends Controller
         $validatedData = $request->validate([
             'idProducto' => 'required|exists:productos,idProducto',
             'cantidad' => 'required|integer|min:1',
-            'idUsuario' => 'required|exists:usuarios,idUsuario' // Asegúrate de que el idUsuario esté presente y exista en la tabla de usuarios
+            'idUsuario' => 'required|exists:usuarios,idUsuario'
         ]);
     
         try {
-            // Encuentra o crea el carrito del usuario
-            $carrito = Carrito::firstOrCreate(
-                ['idUsuario' => $validatedData['idUsuario']]
-            );
+            // Obtener el producto y verificar el stock
+            $producto = Producto::find($validatedData['idProducto']);
     
-            // Crea un nuevo detalle en el carrito
-            CarritoDetalle::create([
-                'idCarrito' => $carrito->idCarrito,
-                'idProducto' => $validatedData['idProducto'],
-                'cantidad' => $validatedData['cantidad'],
-                'precio' => Producto::find($validatedData['idProducto'])->precio
-            ]);
+            // Obtener la cantidad actual del producto en el carrito del usuario
+            $cantidadEnCarrito = CarritoDetalle::where('idCarrito', function ($query) use ($validatedData) {
+                $query->select('idCarrito')
+                      ->from('carrito')
+                      ->where('idUsuario', $validatedData['idUsuario'])
+                      ->limit(1);
+            })
+            ->where('idProducto', $validatedData['idProducto'])
+            ->sum('cantidad');
+    
+            // Calcular la cantidad total después de la nueva adición
+            $cantidadTotal = $cantidadEnCarrito + $validatedData['cantidad'];
+    
+            // Verificar si la cantidad total excede el stock disponible
+            if ($cantidadTotal > $producto->stock) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'La cantidad total en el carrito supera el stock disponible',
+                ], 400);
+            }
+    
+            // Encuentra o crea el carrito del usuario
+            $carrito = Carrito::firstOrCreate(['idUsuario' => $validatedData['idUsuario']]);
+    
+            // Crea o actualiza el detalle en el carrito
+            CarritoDetalle::updateOrCreate(
+                ['idCarrito' => $carrito->idCarrito, 'idProducto' => $validatedData['idProducto']],
+                ['cantidad' => $cantidadTotal, 'precio' => $producto->precio]
+            );
     
             return response()->json(['success' => true, 'message' => 'Producto agregado al carrito'], 201);
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => 'Error al agregar al carrito', 'error' => $e->getMessage()], 500);
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al agregar al carrito',
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
     
@@ -199,14 +223,14 @@ class ClienteController extends Controller
     {
         try {
             $userId = Auth::id();
-
+    
             // Obtener los productos en el carrito del usuario autenticado
             $carritoDetalles = CarritoDetalle::with('producto')
                 ->whereHas('carrito', function($query) use ($userId) {
                     $query->where('idUsuario', $userId);
                 })
                 ->get();
-
+    
             $productos = $carritoDetalles->map(function($detalle) {
                 return [
                     'idProducto' => $detalle->producto->idProducto,
@@ -215,6 +239,7 @@ class ClienteController extends Controller
                     'cantidad' => $detalle->cantidad,
                     'precio' => (float) $detalle->precio, // Asegura que sea un float
                     'subtotal' => (float) ($detalle->precio * $detalle->cantidad),
+                    'stock' => (int) $detalle->producto->stock, // Incluir el stock del producto
                 ];
             });
             
@@ -225,29 +250,42 @@ class ClienteController extends Controller
     }
 
  
-     // Actualizar la cantidad de un producto en el carrito
-     public function actualizarCantidad(Request $request, $idProducto)
-     {
-         $userId = Auth::id();
-         $cantidad = $request->input('cantidad');
- 
-         // Buscar el detalle del carrito que corresponde al producto y usuario autenticado
-         $detalle = CarritoDetalle::whereHas('carrito', function($query) use ($userId) {
-                 $query->where('carrito.idUsuario', $userId); // Cambiar `carrito.id` por `carrito.idUsuario`
-             })
-             ->where('idProducto', $idProducto)
-             ->first();
- 
-         if (!$detalle) {
-             return response()->json(['success' => false, 'message' => 'Producto no encontrado en el carrito'], 404);
-         }
- 
-         // Actualizar la cantidad
-         $detalle->cantidad = $cantidad;
-         $detalle->save();
- 
-         return response()->json(['success' => true, 'message' => 'Cantidad actualizada'], 200);
-     }
+    public function actualizarCantidad(Request $request, $idProducto)
+    {
+        $userId = Auth::id();
+        $cantidad = $request->input('cantidad');
+    
+        // Buscar el detalle del carrito que corresponde al producto y usuario autenticado
+        $detalle = CarritoDetalle::whereHas('carrito', function($query) use ($userId) {
+                $query->where('carrito.idUsuario', $userId);
+            })
+            ->where('idProducto', $idProducto)
+            ->first();
+    
+        if (!$detalle) {
+            return response()->json(['success' => false, 'message' => 'Producto no encontrado en el carrito'], 404);
+        }
+    
+        // Obtener el stock del producto
+        $producto = Producto::find($idProducto);
+        if (!$producto) {
+            return response()->json(['success' => false, 'message' => 'Producto no encontrado en la base de datos'], 404);
+        }
+    
+        // Verificar si la cantidad solicitada excede el stock disponible
+        if ($cantidad > $producto->stock) {
+            return response()->json([
+                'success' => false,
+                'message' => 'La cantidad solicitada supera el stock disponible'
+            ], 400);
+        }
+    
+        // Actualizar la cantidad si está dentro del límite del stock
+        $detalle->cantidad = $cantidad;
+        $detalle->save();
+    
+        return response()->json(['success' => true, 'message' => 'Cantidad actualizada'], 200);
+    }
  
      // Eliminar un producto del carrito
      public function eliminarProducto($idProducto)
@@ -578,13 +616,44 @@ class ClienteController extends Controller
         $direccion->update($request->all());
         return response()->json($direccion);
     }
+ 
 
-    public function eliminarDireccion($id)
+    public function eliminarDireccion($idDireccion)
     {
-        DetalleDireccion::destroy($id);
-        return response()->json(['message' => 'Dirección eliminada con éxito.']);
+        try {
+            // Verificar si existen pedidos asociados en estados restringidos
+            $estadoRestringido = DB::table('detalle_direccion_pedido')
+                ->join('pedidos', 'detalle_direccion_pedido.idPedido', '=', 'pedidos.idPedido')
+                ->where('detalle_direccion_pedido.idDireccion', $idDireccion)
+                ->whereIn('pedidos.estado', ['pendiente', 'aprobando', 'en preparacion', 'enviado'])
+                ->exists();
+    
+            if ($estadoRestringido) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se puede eliminar la dirección: existen pedidos en proceso con esta dirección asignada.',
+                ], 400);
+            }
+    
+            // Eliminar la dirección si no hay pedidos restringidos
+            DB::table('direcciones')->where('idDireccion', $idDireccion)->delete();
+    
+            return response()->json([
+                'success' => true,
+                'message' => 'Dirección eliminada exitosamente.',
+            ], 200);
+    
+        } catch (\Exception $e) {
+            // Manejo de errores y registro en el log
+            Log::error('Error al eliminar la dirección: ' . $e->getMessage());
+    
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al eliminar la dirección.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
-
 
     public function setDireccionUsando($idDireccion)
     {
