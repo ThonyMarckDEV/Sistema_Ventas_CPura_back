@@ -58,11 +58,12 @@ use App\Http\Controllers\AuthController;
         Route::get('/obtenerDireccionPedido/{idPedido}', [AdminController::class, 'obtenerDireccionPedido']);
 
 
-        Route::get('/reportes/total-ventas-completadas', [AdminController::class, 'totalVentasCompletadas']);
+        Route::get('/reportes/total-ingresos', [AdminController::class, 'totalIngresos']);
         Route::get('/reportes/total-pedidos-completados', [AdminController::class, 'totalPedidosCompletados']);
         Route::get('/reportes/total-clientes', [AdminController::class, 'totalClientes']);
         Route::get('/reportes/total-productos', [AdminController::class, 'totalProductos']);
         Route::get('/reportes/productos-bajo-stock', [AdminController::class, 'productosBajoStock']);
+        Route::get('/reportes/pagos-completados', [AdminController::class, 'obtenerPagosCompletados']);
     });
 
     // RUTAS PARA CLIENTE VALIDADA POR MIDDLEWARE AUTH (PARA TOKEN JWT) Y CHECKROLE (PARA VALIDAR ROL DEL TOKEN)

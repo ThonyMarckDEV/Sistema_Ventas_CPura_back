@@ -441,7 +441,7 @@ public function listarProductos()
 
     //FUNCIONES PARA REPORTES
 
-    public function totalVentasCompletadas()
+    public function totalIngresos()
     {
         $totalVentas = DB::table('pagos')
             ->where('estado_pago', 'completado')
@@ -485,6 +485,15 @@ public function listarProductos()
             ->get();
 
         return response()->json(['productosBajoStock' => $productos], 200);
+    }
+
+    public function obtenerPagosCompletados()
+    {
+        $cantidadPagosCompletados = Pago::where('estado_pago', 'completado')->count();
+        
+        return response()->json([
+            'cantidadPagosCompletados' => $cantidadPagosCompletados,
+        ]);
     }
 
 
