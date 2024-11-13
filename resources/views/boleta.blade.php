@@ -101,5 +101,11 @@
             });
         });
     </script>
+    <script>
+        window.onload = function() {
+            // Enviar un mensaje a la ventana principal indicando que la boleta ha cargado
+            window.opener.postMessage('boletaCargada', '*');
+        };
+    </script>
 </body>
 </html>

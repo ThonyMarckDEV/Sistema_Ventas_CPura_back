@@ -451,41 +451,80 @@ class ClienteController extends Controller
      }
         
      
-     public function showBoleta($idPedido)
-     {
-         // Obtener los datos del pedido
-         $pedido = Pedido::find($idPedido);
+    //  public function showBoleta($idPedido)
+    //  {
+    //      // Obtener los datos del pedido
+    //      $pedido = Pedido::find($idPedido);
  
-         if (!$pedido) {
-             return abort(404, 'Pedido no encontrado');
-         }
+    //      if (!$pedido) {
+    //          return abort(404, 'Pedido no encontrado');
+    //      }
  
-         // Obtener los detalles del pedido desde 'pedido_detalle'
-         $detalles = DB::table('pedido_detalle')
-             ->where('idPedido', $idPedido)
-             ->join('productos', 'pedido_detalle.idProducto', '=', 'productos.idProducto')
-             ->select(
-                 'productos.nombreProducto',
-                 'pedido_detalle.cantidad',
-                 'pedido_detalle.precioUnitario',
-                 'pedido_detalle.subtotal'
-             )
-             ->get();
+    //      // Obtener los detalles del pedido desde 'pedido_detalle'
+    //      $detalles = DB::table('pedido_detalle')
+    //          ->where('idPedido', $idPedido)
+    //          ->join('productos', 'pedido_detalle.idProducto', '=', 'productos.idProducto')
+    //          ->select(
+    //              'productos.nombreProducto',
+    //              'pedido_detalle.cantidad',
+    //              'pedido_detalle.precioUnitario',
+    //              'pedido_detalle.subtotal'
+    //          )
+    //          ->get();
  
-         $total = $pedido->total;
+    //      $total = $pedido->total;
  
-         // Obtener el usuario asociado al pedido
-         $usuario = Usuario::find($pedido->idUsuario);
+    //      // Obtener el usuario asociado al pedido
+    //      $usuario = Usuario::find($pedido->idUsuario);
  
-         if (!$usuario) {
-             return abort(404, 'Usuario no encontrado');
-         }
+    //      if (!$usuario) {
+    //          return abort(404, 'Usuario no encontrado');
+    //      }
  
-         // Concatenar nombres y apellidos
-         $nombreCompleto = $usuario->nombres . ' ' . $usuario->apellidos;
+    //      // Concatenar nombres y apellidos
+    //      $nombreCompleto = $usuario->nombres . ' ' . $usuario->apellidos;
  
-         return view('boleta', compact('detalles', 'total', 'nombreCompleto'));
-     }
+    //      return view('boleta', compact('detalles', 'total', 'nombreCompleto'));
+    //  }
+
+
+    public function showBoleta($idPedido)
+    {
+        // Obtener los datos del pedido
+        $pedido = Pedido::find($idPedido);
+
+        if (!$pedido) {
+            return abort(404, 'Pedido no encontrado');
+        }
+
+        // Obtener los detalles del pedido desde 'pedido_detalle'
+        // Limitar a los datos necesarios para evitar sobrecarga
+        $detalles = DB::table('pedido_detalle')
+            ->where('idPedido', $idPedido)
+            ->join('productos', 'pedido_detalle.idProducto', '=', 'productos.idProducto')
+            ->select(
+                'productos.nombreProducto',
+                'pedido_detalle.cantidad',
+                'pedido_detalle.precioUnitario',
+                'pedido_detalle.subtotal'
+            )
+            ->limit(100) // Limitar la cantidad de productos para evitar carga pesada
+            ->get();
+
+        $total = $pedido->total;
+
+        // Obtener el usuario asociado al pedido
+        $usuario = Usuario::find($pedido->idUsuario);
+
+        if (!$usuario) {
+            return abort(404, 'Usuario no encontrado');
+        }
+
+        // Concatenar nombres y apellidos
+        $nombreCompleto = $usuario->nombres . ' ' . $usuario->apellidos;
+
+        return view('boleta', compact('detalles', 'total', 'nombreCompleto'));
+    }
 
 
      public function listarPedidos($idUsuario)
