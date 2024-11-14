@@ -10,6 +10,8 @@ use Tymon\JWTAuth\Exceptions\JWTException;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Cache;
 
 class AuthController extends Controller
 {
@@ -190,4 +192,96 @@ class AuthController extends Controller
          }
      }
     
+
+     public function sendContactEmail(Request $request)
+     {
+         $request->validate([
+             'name' => 'required|string|max:255',
+             'email' => 'required|email',
+             'message' => 'required|string',
+         ]);
+ 
+         // Configura los datos del correo
+         $data = [
+             'name' => $request->name,
+             'email' => $request->email,
+             'messageContent' => $request->message,
+         ];
+ 
+         // Envía el correo
+         Mail::send('emails.contact', $data, function($message) use ($request) {
+             $message->to('destinatario@example.com', 'Administrador')
+                     ->subject('Nuevo mensaje de contacto');
+             $message->from($request->email, $request->name);
+         });
+ 
+         return response()->json(['success' => 'Mensaje enviado correctamente.']);
+     }
+
+     public function sendVerificationCodeUser(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email|exists:usuarios,correo',
+        ]);
+
+        $user = Usuario::where('correo', $request->email)->first();
+        
+        $verificationCode = rand(100000, 999999);
+        Cache::put("verification_code_{$user->id}", $verificationCode, now()->addMinutes(10)); // Expira en 10 minutos
+
+        Mail::raw("Tu código de verificación es: {$verificationCode}", function($message) use ($user) {
+            $message->to($user->correo)
+                    ->subject('Código de Verificación para Restablecer Contraseña');
+        });
+
+        return response()->json(['message' => 'Código de verificación enviado'], 200);
+    }
+
+    public function verifyCodeUser(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email|exists:usuarios,correo',
+            'code' => 'required|numeric',
+        ]);
+
+        $user = Usuario::where('correo', $request->email)->first();
+        $storedCode = Cache::get("verification_code_{$user->id}");
+
+        if ($storedCode && $storedCode == $request->code) {
+            Cache::forget("verification_code_{$user->id}");
+            Cache::put("password_reset_allowed_{$user->id}", true, now()->addMinutes(10));
+
+            return response()->json(['message' => 'Código verificado'], 200);
+        }
+
+        return response()->json(['message' => 'Código incorrecto o expirado'], 400);
+    }
+
+    public function changePasswordUser(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email|exists:usuarios,correo',
+            'newPassword' => 'required|min:8',
+        ]);
+
+        $user = Usuario::where('correo', $request->email)->first();
+        $resetAllowed = Cache::get("password_reset_allowed_{$user->id}");
+
+        if ($resetAllowed) {
+            $user->password = bcrypt($request->newPassword);
+            $user->save();
+
+            Cache::forget("password_reset_allowed_{$user->id}");
+
+            Mail::raw('Tu contraseña ha sido cambiada correctamente.', function($message) use ($user) {
+                $message->to($user->correo)
+                        ->subject('Confirmación de Cambio de Contraseña');
+            });
+
+            return response()->json(['message' => 'Contraseña cambiada exitosamente'], 200);
+        }
+
+        return response()->json(['message' => 'No autorizado para cambiar la contraseña'], 403);
+    }
+
 }
