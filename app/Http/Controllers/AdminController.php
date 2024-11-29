@@ -19,7 +19,6 @@ use Illuminate\Support\Facades\Mail;
 
 class AdminController extends Controller
 {
-    // FUNCION PARA REGISTRAR UN USUARIO
     public function register(Request $request)
     {
         $messages = [
@@ -60,7 +59,7 @@ class AdminController extends Controller
             'nacimiento' => 'nullable|date|before:today',
             'telefono' => 'nullable|string|size:9|regex:/^\d{9}$/',
             'departamento' => 'nullable|string|max:255',
-           'password' => [
+            'password' => [
                 'required',
                 'string',
                 'min:8',
@@ -77,6 +76,7 @@ class AdminController extends Controller
         }
 
         try {
+            // Registrar el usuario
             $user = Usuario::create([
                 'username' => $request->username,
                 'rol' => $request->rol,
@@ -92,21 +92,26 @@ class AdminController extends Controller
                 'status' => 'loggedOff',
             ]);
 
+            // Crear el carrito asociado al usuario recién registrado
+            $carrito = new Carrito();
+            $carrito->idUsuario = $user->idUsuario; // Asignar el id del usuario al carrito
+            $carrito->save(); // Guardar el carrito
+
+            // Devolver la respuesta con éxito
             return response()->json([
                 'success' => true,
-                'message' => 'Usuario registrado exitosamente',
+                'message' => 'Usuario registrado y carrito creado exitosamente',
             ], 201);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error al registrar el usuario',
+                'message' => 'Error al registrar el usuario y crear el carrito',
                 'error' => $e->getMessage(),
             ], 500);
         }
     }
-
-    
+ 
     // Listar usuarios
     public function listarUsuarios()
     {

@@ -142,37 +142,42 @@ class AuthController extends Controller
 
     public function checkStatus(Request $request)
     {
-        $idUsuario = $request->input('idUsuario');
-        $token = $request->input('token');
-    
-        if (!$idUsuario || !$token) {
-            // Sin idUsuario o token, responde como inválido
+        // Obtener el token del header Authorization
+        $token = $request->header('Authorization');
+        
+        // Si no existe el token o idUsuario
+        if (!$token || !$request->has('idUsuario')) {
             return response()->json(['status' => 'invalidToken'], 401);
         }
-    
-        // Busca el usuario por id
+
+        // Extraer el token de la cabecera Authorization
+        $token = str_replace('Bearer ', '', $token); // El token viene con el prefijo 'Bearer '
+
+        // Obtener el idUsuario del cuerpo de la solicitud
+        $idUsuario = $request->input('idUsuario');
+        
+        // Buscar el usuario en la base de datos
         $user = Usuario::find($idUsuario);
-    
-        // Verifica si el token es válido
+
+        // Verificar la validez del token
         $isTokenValid = $this->validateToken($token, $idUsuario);
-    
-        // Responde según el estado y validez del token
+
+        // Verificar que el usuario existe
         if (!$user) {
-            // Usuario no encontrado en la BD
             return response()->json(['status' => 'loggedOff'], 401);
         }
-    
-        if ($user && !$isTokenValid) {
-            // Usuario existe pero el token es inválido
+
+        // Verificar si el token es válido
+        if (!$isTokenValid) {
             return response()->json(['status' => 'loggedOnInvalidToken'], 401);
         }
-    
+
+        // Verificar si el usuario está desconectado
         if ($user->status === 'loggedOff') {
-            // Usuario existe pero está marcado como `loggedOff` en la BD
             return response()->json(['status' => 'loggedOff'], 401);
         }
-    
-        // Usuario está activo y el token es válido
+
+        // Si el token es válido y el usuario está activo
         return response()->json(['status' => 'loggedOn', 'isTokenValid' => true], 200);
     }
 

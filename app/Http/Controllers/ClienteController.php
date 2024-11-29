@@ -28,7 +28,6 @@ use Illuminate\Support\Facades\Mail;
 
 class ClienteController extends Controller
 {
-    // FUNCION PARA REGISTRAR UN USUARIO
     public function registerUser(Request $request)
     {
         $messages = [
@@ -53,7 +52,7 @@ class ClienteController extends Controller
             'password.regex' => 'La contraseña debe incluir al menos una mayúscula y un símbolo.',
             'password.confirmed' => 'Las contraseñas no coinciden.',
         ];
-
+    
         $validator = Validator::make($request->all(), [
             'username' => 'required|string|max:255|unique:usuarios',
             'rol' => 'required|string|max:255',
@@ -76,15 +75,16 @@ class ClienteController extends Controller
                 'regex:/^(?=.*[A-Z])(?=.*[!@#$%^&*(),.?":{}|<>])[A-Za-z\d!@#$%^&*(),.?":{}|<>]{8,}$/',
             ]
         ], $messages);
-
+    
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
                 'errors' => $validator->errors(),
             ], 400);
         }
-
+    
         try {
+            // Registrar el usuario
             $user = Usuario::create([
                 'username' => $request->username,
                 'rol' => $request->rol,
@@ -99,16 +99,22 @@ class ClienteController extends Controller
                 'password' => bcrypt($request->password),
                 'status' => 'loggedOff',
             ]);
-
+    
+            // Crear el carrito asociado al usuario
+            $carrito = new Carrito();
+            $carrito->idUsuario = $user->idUsuario; // Asignar el idUsuario al carrito
+            $carrito->save(); // Guardar el carrito
+    
+            // Devolver respuesta con éxito
             return response()->json([
                 'success' => true,
-                'message' => 'Usuario registrado exitosamente',
+                'message' => 'Usuario registrado y carrito creado exitosamente',
             ], 201);
-
+    
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error al registrar el usuario',
+                'message' => 'Error al registrar el usuario y crear el carrito',
                 'error' => $e->getMessage(),
             ], 500);
         }

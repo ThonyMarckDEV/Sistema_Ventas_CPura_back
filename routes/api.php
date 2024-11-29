@@ -28,12 +28,14 @@ use App\Http\Controllers\AuthController;
 
         Route::post('/registerUser', [ClienteController::class, 'registerUser']);
 
-        Route::post('/check-status', [AuthController::class, 'checkStatus']);
+        Route::post('check-status', [AuthController::class, 'checkStatus']);
 
         Route::post('/send-message', [AuthController::class, 'sendContactEmail']);
 
         Route::post('/send-verification-codeUser', [AuthController::class, 'sendVerificationCodeUser']);
+
         Route::post('/verify-codeUser', [AuthController::class, 'verifyCodeUser']);
+
         Route::post('/change-passwordUser', [AuthController::class, 'changePasswordUser']);
 //================================================================================================
 
